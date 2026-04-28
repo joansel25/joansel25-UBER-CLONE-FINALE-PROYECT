@@ -13,7 +13,6 @@ initializeFirebase();
 // Connect to Database
 connectDB();
 
-
 const PORT = process.env.PORT || 5000;
 
 // Middlewares
