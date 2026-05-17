@@ -2,30 +2,46 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 require('dotenv').config();
+
 const connectDB = require('./config/db');
 const { initializeFirebase } = require('./config/firebase');
-
-
+const errorHandler = require('./middleware/errorMiddleware');
 
 const app = express();
-
-initializeFirebase();
-// Connect to Database
-connectDB();
-
 const PORT = process.env.PORT || 5000;
 
-// Middlewares
+// Base middleware stack
 app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
-// Basic Route
-app.get('/', (req, res) => {
-  res.send('UberClone API is running...');
+// Routing
+app.use('/api/users', require('./routes/userRoutes'));
+app.use('/api/drivers', require('./routes/driverRoutes'));
+
+// 404 fallback
+app.use((req, res, next) => {
+  const error = new Error(`Route not found - ${req.originalUrl}`);
+  res.status(404);
+  next(error);
 });
 
-// Start Server
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+// Final error handling - Must be last
+app.use(errorHandler);
+
+const startServer = async () => {
+  try {
+    // Core service init
+    await connectDB();
+    initializeFirebase();
+
+    app.listen(PORT, () => {
+      console.log(`🚀 Server listening on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('Startup failed:', error);
+    process.exit(1);
+  }
+};
+
+startServer();

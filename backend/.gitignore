@@ -20,3 +20,9 @@ yarn-error.log*
 # OS files
 .DS_Store
 Thumbs.db
+
+# Root level project files to ignore
+../gpbus_uber_clone_sprint_plan.html
+../Proyecto_\ Final.docx
+gpbus_uber_clone_sprint_plan.html
+Proyecto_ Final.docx

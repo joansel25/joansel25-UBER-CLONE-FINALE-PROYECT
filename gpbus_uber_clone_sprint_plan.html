@@ -1,0 +1,380 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans)}
+.root{padding:1rem 0}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1.5rem}
+.tab{padding:6px 14px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);cursor:pointer;font-size:13px;transition:all .15s}
+.tab.active{background:var(--color-background-info);color:var(--color-text-info);border-color:transparent;font-weight:500}
+.section{display:none}.section.active{display:block}
+
+/* Sprint cards */
+.sprint-card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:1rem 1.25rem;margin-bottom:1rem}
+.sprint-header{display:flex;align-items:center;gap:10px;margin-bottom:.75rem}
+.sprint-badge{font-size:12px;font-weight:500;padding:3px 10px;border-radius:var(--border-radius-md)}
+.badge-blue{background:var(--color-background-info);color:var(--color-text-info)}
+.badge-teal{background:#E1F5EE;color:#0F6E56}
+.badge-amber{background:#FAEEDA;color:#854F0B}
+.badge-purple{background:#EEEDFE;color:#534AB7}
+.sprint-title{font-size:15px;font-weight:500;color:var(--color-text-primary)}
+.sprint-meta{font-size:12px;color:var(--color-text-secondary);margin-bottom:1rem}
+.us-list{display:flex;flex-direction:column;gap:.5rem}
+.us-item{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.6rem .9rem}
+.us-header{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.us-id{font-size:11px;font-weight:500;color:var(--color-text-tertiary);font-family:var(--font-mono)}
+.us-role{font-size:11px;padding:2px 7px;border-radius:999px;font-weight:500}
+.role-a{background:#E6F1FB;color:#185FA5}
+.role-b{background:#E1F5EE;color:#0F6E56}
+.role-ab{background:#EEEDFE;color:#534AB7}
+.us-title{font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:4px}
+.us-body{font-size:12px;color:var(--color-text-secondary);line-height:1.5}
+.us-body b{font-weight:500;color:var(--color-text-primary)}
+
+/* Git section */
+.git-card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:1rem 1.25rem;margin-bottom:1rem}
+.branch-row{display:flex;align-items:center;gap:10px;padding:.6rem 0;border-bottom:0.5px solid var(--color-border-tertiary)}
+.branch-row:last-child{border-bottom:none}
+.branch-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.dot-main{background:#E24B4A}
+.dot-a{background:#185FA5}
+.dot-b{background:#0F6E56}
+.branch-name{font-family:var(--font-mono);font-size:13px;font-weight:500;color:var(--color-text-primary);min-width:140px}
+.branch-desc{font-size:12px;color:var(--color-text-secondary)}
+
+/* Roles */
+.role-card{border-radius:var(--border-radius-lg);padding:1rem 1.25rem;margin-bottom:1rem;border:0.5px solid var(--color-border-tertiary)}
+.role-a-card{background:var(--color-background-primary)}
+.role-b-card{background:var(--color-background-primary)}
+.role-card-header{display:flex;align-items:center;gap:10px;margin-bottom:.75rem}
+.avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:14px;flex-shrink:0}
+.avatar-a{background:#E6F1FB;color:#185FA5}
+.avatar-b{background:#E1F5EE;color:#0F6E56}
+.role-card-title{font-size:15px;font-weight:500;color:var(--color-text-primary)}
+.role-card-sub{font-size:12px;color:var(--color-text-secondary)}
+.task-list{list-style:none;display:flex;flex-direction:column;gap:.4rem}
+.task-list li{font-size:12px;color:var(--color-text-secondary);padding-left:14px;position:relative;line-height:1.5}
+.task-list li::before{content:"→";position:absolute;left:0;color:var(--color-text-tertiary)}
+.task-list li b{font-weight:500;color:var(--color-text-primary)}
+
+/* Commit section */
+.commit-box{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.75rem 1rem;margin-bottom:.75rem;border-left:3px solid var(--color-border-secondary)}
+.commit-type{font-size:11px;font-family:var(--font-mono);font-weight:500;color:var(--color-text-info);margin-bottom:4px}
+.commit-examples{display:flex;flex-direction:column;gap:4px}
+.commit-ex{font-size:12px;font-family:var(--font-mono);color:var(--color-text-secondary)}
+</style>
+
+<div class="root">
+  <div class="tabs">
+    <button class="tab active" onclick="show('sprints')">📋 Sprints & US</button>
+    <button class="tab" onclick="show('git')">🌿 Git & Ramas</button>
+    <button class="tab" onclick="show('roles')">👥 Roles A / B</button>
+    <button class="tab" onclick="show('commits')">✍️ Commits</button>
+  </div>
+
+  <!-- SPRINTS -->
+  <div id="sprints" class="section active">
+
+    <div class="sprint-card">
+      <div class="sprint-header">
+        <span class="sprint-badge badge-blue">Sprint 1</span>
+        <span class="sprint-title">Setup & Auth</span>
+      </div>
+      <div class="sprint-meta">Semanas 1–2 · Duración: 2 semanas · Objetivo: proyecto corriendo + autenticación completa</div>
+      <div class="us-list">
+
+        <div class="us-item">
+          <div class="us-header">
+            <span class="us-id">US-01</span>
+            <span class="us-role role-ab">A + B</span>
+          </div>
+          <div class="us-title">Configuración del entorno de desarrollo</div>
+          <div class="us-body">
+            <b>Como</b> equipo de desarrollo, <b>quiero</b> tener el proyecto React Native CLI configurado con ESLint, Prettier, estructura de carpetas y ramas de GitHub, <b>para que</b> todos los integrantes puedan trabajar de forma consistente desde el inicio.<br>
+            <b>Criterios:</b> Repo con 3 ramas (main, dev-A, dev-B), RN corriendo en simulador Android/iOS, reglas de linting aplicadas.
+          </div>
+        </div>
+
+        <div class="us-item">
+          <div class="us-header">
+            <span class="us-id">US-02</span>
+            <span class="us-role role-a">Comp. A</span>
+          </div>
+          <div class="us-title">Registro de usuario con validación</div>
+          <div class="us-body">
+            <b>Como</b> usuario nuevo, <b>quiero</b> registrarme con nombre completo, celular, género, correo (con validación de @ y dominio) e idioma (ES/EN), <b>para que</b> mi cuenta quede almacenada en Firebase/MongoDB y pueda ingresar a la app.<br>
+            <b>Criterios:</b> Ningún campo acepta nulos/vacíos. Tab navigation entre secciones de perfil. Foto de perfil cargable.
+          </div>
+        </div>
+
+        <div class="us-item">
+          <div class="us-header">
+            <span class="us-id">US-03</span>
+            <span class="us-role role-b">Comp. B</span>
+          </div>
+          <div class="us-title">Pantalla de Login con navegación Tab</div>
+          <div class="us-body">
+            <b>Como</b> usuario registrado, <b>quiero</b> iniciar sesión con correo y contraseña, <b>para que</b> pueda acceder al flujo principal de la app con una navegación Tab estructurada (React Navigation).<br>
+            <b>Criterios:</b> Autenticación con Firebase Auth. Manejo de errores con mensajes claros. Redirección correcta al Tab principal.
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="sprint-card">
+      <div class="sprint-header">
+        <span class="sprint-badge badge-teal">Sprint 2</span>
+        <span class="sprint-title">Mapas & Búsqueda de destino</span>
+      </div>
+      <div class="sprint-meta">Semanas 3–4 · Objetivo: usuario ve mapa con su ubicación y busca destinos con Autocomplete</div>
+      <div class="us-list">
+
+        <div class="us-item">
+          <div class="us-header">
+            <span class="us-id">US-04</span>
+            <span class="us-role role-a">Comp. A</span>
+          </div>
+          <div class="us-title">Visualización de mapa con ubicación actual</div>
+          <div class="us-body">
+            <b>Como</b> usuario, <b>quiero</b> ver un mapa interactivo centrado en mi ubicación actual, <b>para que</b> pueda orientarme antes de solicitar un viaje.<br>
+            <b>Criterios:</b> Google Maps API integrada. Marcador animado en posición del usuario. Solicitud de permisos de ubicación manejada correctamente. Redux guarda estado del mapa.
+          </div>
+        </div>
+
+        <div class="us-item">
+          <div class="us-header">
+            <span class="us-id">US-05</span>
+            <span class="us-role role-b">Comp. B</span>
+          </div>
+          <div class="us-title">Búsqueda de destino con Google Places Autocomplete</div>
+          <div class="us-body">
+            <b>Como</b> usuario, <b>quiero</b> escribir un destino y recibir sugerencias en tiempo real, <b>para que</b> encuentre rápidamente el lugar al que quiero ir.<br>
+            <b>Criterios:</b> Google Places Autocomplete integrado. Sugerencias se actualizan mientras el usuario escribe. Al seleccionar, el mapa centra el destino.
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="sprint-card">
+      <div class="sprint-header">
+        <span class="sprint-badge badge-amber">Sprint 3</span>
+        <span class="sprint-title">Solicitud de Viaje & Rutas</span>
+      </div>
+      <div class="sprint-meta">Semanas 5–6 · Objetivo: usuario puede ver ruta, elegir tipo de vehículo y ver tarifa estimada</div>
+      <div class="us-list">
+
+        <div class="us-item">
+          <div class="us-header">
+            <span class="us-id">US-06</span>
+            <span class="us-role role-a">Comp. A</span>
+          </div>
+          <div class="us-title">Cálculo y visualización de ruta óptima</div>
+          <div class="us-body">
+            <b>Como</b> usuario, <b>quiero</b> ver la ruta trazada entre mi origen y destino con tiempo y distancia estimados, <b>para que</b> sepa cuánto tardará mi viaje antes de confirmar.<br>
+            <b>Criterios:</b> Google Directions API + Distance Matrix API. Polyline dibujada en el mapa. ETA y distancia mostrados en card inferior.
+          </div>
+        </div>
+
+        <div class="us-item">
+          <div class="us-header">
+            <span class="us-id">US-07</span>
+            <span class="us-role role-b">Comp. B</span>
+          </div>
+          <div class="us-title">Selección de categoría de vehículo y tarifa estimada</div>
+          <div class="us-body">
+            <b>Como</b> usuario, <b>quiero</b> elegir entre Económico, XL y Premium, <b>para que</b> vea la tarifa estimada de cada categoría antes de confirmar mi solicitud.<br>
+            <b>Criterios:</b> Cards con precio por categoría. Redux guarda selección. Botón de confirmar activo solo cuando hay selección válida.
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="sprint-card">
+      <div class="sprint-header">
+        <span class="sprint-badge badge-purple">Sprint 4</span>
+        <span class="sprint-title">Seguimiento, Pagos e Historial</span>
+      </div>
+      <div class="sprint-meta">Semanas 7–8 · Objetivo: tracking en tiempo real, pasarela de pagos e historial de viajes</div>
+      <div class="us-list">
+
+        <div class="us-item">
+          <div class="us-header">
+            <span class="us-id">US-08</span>
+            <span class="us-role role-a">Comp. A</span>
+          </div>
+          <div class="us-title">Seguimiento en tiempo real del conductor</div>
+          <div class="us-body">
+            <b>Como</b> pasajero, <b>quiero</b> ver el conductor aproximándose en el mapa con un marcador animado en tiempo real, <b>para que</b> sepa exactamente cuándo llegará.<br>
+            <b>Criterios:</b> Marcador del conductor actualizado vía Firebase Realtime DB. Animación fluida del marcador. Posición del pasajero también visible.
+          </div>
+        </div>
+
+        <div class="us-item">
+          <div class="us-header">
+            <span class="us-id">US-09</span>
+            <span class="us-role role-b">Comp. B</span>
+          </div>
+          <div class="us-title">Integración de pasarela de pagos (Stripe / Mercado Pago)</div>
+          <div class="us-body">
+            <b>Como</b> usuario, <b>quiero</b> pagar mi viaje con tarjeta o Mercado Pago, <b>para que</b> la transacción sea segura y quede registrada.<br>
+            <b>Criterios:</b> Stripe SDK integrado. Flujo de pago completo (formulario → confirmación → error). Registro del pago en DB asociado al viaje.
+          </div>
+        </div>
+
+        <div class="us-item">
+          <div class="us-header">
+            <span class="us-id">US-10</span>
+            <span class="us-role role-ab">A + B</span>
+          </div>
+          <div class="us-title">Historial de viajes con detalles</div>
+          <div class="us-body">
+            <b>Como</b> usuario, <b>quiero</b> ver el listado de mis viajes anteriores con costo, fecha y ruta, <b>para que</b> pueda llevar un registro de mis desplazamientos y gastos.<br>
+            <b>Criterios:</b> Lista paginada desde DB. Cada item muestra origen, destino, fecha, costo. Toque en item muestra detalle completo.
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- GIT -->
+  <div id="git" class="section">
+    <div class="git-card">
+      <div style="font-size:14px;font-weight:500;margin-bottom:12px;color:var(--color-text-primary)">Estructura de ramas</div>
+      <div class="branch-row">
+        <div class="branch-dot dot-main"></div>
+        <div class="branch-name">main</div>
+        <div class="branch-desc">Código estable y listo para producción. Solo recibe merges al finalizar cada sprint vía PR revisado.</div>
+      </div>
+      <div class="branch-row">
+        <div class="branch-dot dot-a"></div>
+        <div class="branch-name">feature/dev-A</div>
+        <div class="branch-desc">Rama de trabajo del Compañero A (Backend/Maps/Auth). Aquí suben todos los commits del compañero A durante el sprint.</div>
+      </div>
+      <div class="branch-row">
+        <div class="branch-dot dot-b"></div>
+        <div class="branch-name">feature/dev-B</div>
+        <div class="branch-desc">Rama de trabajo del Compañero B (UI/Navigation/Payments). Aquí suben todos los commits del compañero B durante el sprint.</div>
+      </div>
+    </div>
+
+    <div class="git-card">
+      <div style="font-size:14px;font-weight:500;margin-bottom:12px;color:var(--color-text-primary)">Flujo de trabajo por sprint</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <span style="background:var(--color-background-info);color:var(--color-text-info);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0">1</span>
+          <div style="font-size:13px;color:var(--color-text-secondary);line-height:1.5"><b style="color:var(--color-text-primary)">Inicio de sprint:</b> Cada uno hace <span style="font-family:var(--font-mono);font-size:12px">git pull origin main</span> en su rama para sincronizar.</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <span style="background:var(--color-background-info);color:var(--color-text-info);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0">2</span>
+          <div style="font-size:13px;color:var(--color-text-secondary);line-height:1.5"><b style="color:var(--color-text-primary)">Desarrollo:</b> Commits frecuentes en su propia rama (<span style="font-family:var(--font-mono);font-size:12px">feature/dev-A</span> o <span style="font-family:var(--font-mono);font-size:12px">feature/dev-B</span>). Mínimo 1 commit por sesión de trabajo.</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <span style="background:var(--color-background-info);color:var(--color-text-info);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0">3</span>
+          <div style="font-size:13px;color:var(--color-text-secondary);line-height:1.5"><b style="color:var(--color-text-primary)">Fin de sprint:</b> Cada uno abre un Pull Request desde su rama hacia <span style="font-family:var(--font-mono);font-size:12px">main</span>. El compañero revisa el PR antes del merge.</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <span style="background:var(--color-background-info);color:var(--color-text-info);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0">4</span>
+          <div style="font-size:13px;color:var(--color-text-secondary);line-height:1.5"><b style="color:var(--color-text-primary)">Merge:</b> Se resuelven conflictos localmente, se aprueba el PR y se hace merge a <span style="font-family:var(--font-mono);font-size:12px">main</span>. Nunca push directo a main.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROLES -->
+  <div id="roles" class="section">
+    <div class="role-card role-a-card">
+      <div class="role-card-header">
+        <div class="avatar avatar-a">A</div>
+        <div>
+          <div class="role-card-title">Compañero A — Backend & Maps Lead</div>
+          <div class="role-card-sub">Rama: feature/dev-A</div>
+        </div>
+      </div>
+      <ul class="task-list">
+        <li><b>Sprint 1:</b> Configuración del proyecto RN CLI, estructura de carpetas, configuración de Redux store, integración Firebase/MongoDB (auth + DB)</li>
+        <li><b>Sprint 2:</b> Google Maps API + permisos de ubicación, marcador del usuario en tiempo real</li>
+        <li><b>Sprint 3:</b> Google Directions API, Distance Matrix API, polyline en mapa, ETA</li>
+        <li><b>Sprint 4:</b> Firebase Realtime DB para tracking del conductor, marcador animado del driver</li>
+        <li><b>Siempre:</b> Lógica de negocio en Redux (actions, reducers, selectors), integración con endpoints de DB, manejo de hooks personalizados (useLocation, useTrip, useAuth)</li>
+      </ul>
+    </div>
+
+    <div class="role-card role-b-card">
+      <div class="role-card-header">
+        <div class="avatar avatar-b">B</div>
+        <div>
+          <div class="role-card-title">Compañero B — UI/UX & Integrations Lead</div>
+          <div class="role-card-sub">Rama: feature/dev-B</div>
+        </div>
+      </div>
+      <ul class="task-list">
+        <li><b>Sprint 1:</b> Pantallas de Login y Registro, Tab Navigation con React Navigation, validaciones de formularios, foto de perfil</li>
+        <li><b>Sprint 2:</b> Componente de búsqueda con Google Places Autocomplete, sugerencias en tiempo real, UI de destino</li>
+        <li><b>Sprint 3:</b> Cards de selección de vehículo (Económico/XL/Premium), UI de tarifa estimada, botón de confirmación</li>
+        <li><b>Sprint 4:</b> Integración Stripe SDK (UI del formulario de pago), pantalla de historial de viajes, pantalla de detalle de viaje</li>
+        <li><b>Siempre:</b> Componentes reutilizables, sistema de estilos consistente, i18n (Español/Inglés), manejo de estados de carga y error en UI</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- COMMITS -->
+  <div id="commits" class="section">
+    <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:1rem;line-height:1.6">
+      Todos los mensajes de commit deben estar <b style="color:var(--color-text-primary)">en inglés</b>, seguir el formato <span style="font-family:var(--font-mono);font-size:12px">type(scope): short description</span> y ser descriptivos del cambio.
+    </div>
+
+    <div class="commit-box">
+      <div class="commit-type">feat — nueva funcionalidad</div>
+      <div class="commit-examples">
+        <div class="commit-ex">feat(auth): add user registration with field validation</div>
+        <div class="commit-ex">feat(maps): integrate Google Maps API with user location marker</div>
+        <div class="commit-ex">feat(trip): add vehicle category selection with fare estimate</div>
+      </div>
+    </div>
+
+    <div class="commit-box">
+      <div class="commit-type">fix — corrección de bug</div>
+      <div class="commit-examples">
+        <div class="commit-ex">fix(auth): prevent empty email submission on login form</div>
+        <div class="commit-ex">fix(maps): resolve location permission crash on Android 13</div>
+      </div>
+    </div>
+
+    <div class="commit-box">
+      <div class="commit-type">refactor — mejora sin cambio de funcionalidad</div>
+      <div class="commit-examples">
+        <div class="commit-ex">refactor(redux): split trip reducer into smaller slices</div>
+        <div class="commit-ex">refactor(ui): extract reusable VehicleCard component</div>
+      </div>
+    </div>
+
+    <div class="commit-box">
+      <div class="commit-type">chore — configuración / dependencias</div>
+      <div class="commit-examples">
+        <div class="commit-ex">chore: add ESLint and Prettier configuration</div>
+        <div class="commit-ex">chore(deps): upgrade react-navigation to v7</div>
+      </div>
+    </div>
+
+    <div class="commit-box">
+      <div class="commit-type">docs — documentación</div>
+      <div class="commit-examples">
+        <div class="commit-ex">docs: add setup instructions to README</div>
+        <div class="commit-ex">docs(api): document Google Maps integration steps</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function show(id){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>

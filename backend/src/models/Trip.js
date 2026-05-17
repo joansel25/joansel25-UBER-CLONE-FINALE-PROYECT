@@ -1,5 +1,9 @@
 const mongoose = require('mongoose');
 
+/**
+ * Trip lifecycle management.
+ * Tracks service from request to completion.
+ */
 const tripSchema = new mongoose.Schema({
   passenger: {
     type: mongoose.Schema.Types.ObjectId,
@@ -33,8 +37,8 @@ const tripSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
-  distance: Number, // en km
-  duration: Number, // en minutos
+  distance: Number, // in km
+  duration: Number, // in minutes
   vehicleCategory: {
     type: String,
     enum: ['economy', 'xl', 'premium'],
@@ -45,7 +49,7 @@ const tripSchema = new mongoose.Schema({
     enum: ['card', 'cash'],
     default: 'card'
   },
-  polyline: String,
+  polyline: String, // Map route path
   acceptedAt: Date,
   startedAt: Date,
   completedAt: Date
@@ -53,6 +57,7 @@ const tripSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Optimize proximity lookups
 tripSchema.index({ 'origin.location': '2dsphere' });
 tripSchema.index({ 'destination.location': '2dsphere' });
 

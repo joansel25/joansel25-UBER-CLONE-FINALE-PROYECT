@@ -1,35 +1,36 @@
 const { admin } = require('../config/firebase');
 
-
+/**
+ * Auth guard. 
+ * Validates Firebase ID tokens and attaches user identity to the request.
+ */
 const protect = async (req, res, next) => {
   let token;
 
-
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+  if (req.headers.authorization?.startsWith('Bearer')) {
     try {
-
       token = req.headers.authorization.split(' ')[1];
 
-
+      // Delegate validation to Firebase Admin SDK
       const decodedToken = await admin.auth().verifyIdToken(token);
-
+      
+      // Inject user payload for downstream handlers
       req.user = decodedToken;
-
-      next();
+      
+      return next();
     } catch (error) {
-      console.error('❌ Error de autenticación:', error.message);
+      console.error('Auth check failed:', error.message);
       return res.status(401).json({
         success: false,
-        message: 'No autorizado, el carnet (Token) es inválido o expiró'
+        message: 'Invalid or expired token'
       });
     }
   }
-
-
+ 
   if (!token) {
     return res.status(401).json({
       success: false,
-      message: 'No autorizado, no se proporcionó ningún(Token)'
+      message: 'Authentication required'
     });
   }
 };
