@@ -76,3 +76,7 @@ yarn-error.log
 
 # Project files
 *.pdf
+
+# Environment variables — never commit real keys
+.env
+.env.local

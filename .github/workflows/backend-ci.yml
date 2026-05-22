@@ -2,7 +2,7 @@ name: Backend CI
 
 on:
   push:
-    branches: [ "main", "develop-sebas" ]
+    branches: [ "main", "develop-sebas", "integration/monorepo" ]
   pull_request:
     branches: [ "main", "develop-sebas" ]
 
