@@ -1,13 +1,22 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 
 import PersonalInfoTab from './tabs/PersonalInfoTab';
 import ContactTab from './tabs/ContactTab';
 import PreferencesTab from './tabs/PreferencesTab';
+import { useAuth } from '../context/AuthContext';
 
 export default function RegisterProfileScreen() {
+  const { signOut } = useAuth();
+
+  const handleLogout = () => {
+    Alert.alert('Cerrar sesión', '¿Deseas cerrar tu sesión?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Salir', style: 'destructive', onPress: signOut },
+    ]);
+  };
   // Local state to manage active tab and form data
   const [activeTab, setActiveTab] = useState('personal');
   const [formData, setFormData] = useState({
@@ -41,7 +50,12 @@ export default function RegisterProfileScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
 
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Profile</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.headerTitle}>My Profile</Text>
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
+            <Icon name="log-out-outline" size={22} color="#FF3B30" />
+          </TouchableOpacity>
+        </View>
         <Text style={styles.headerSubtitle}>Complete your information to get started</Text>
         <Text style={styles.headerSubtitle}>All spaces with * are mandatory</Text>
       </View>
@@ -111,6 +125,14 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 20,
     backgroundColor: '#fff',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  logoutBtn: {
+    padding: 4,
   },
   headerTitle: {
     fontSize: 28,
