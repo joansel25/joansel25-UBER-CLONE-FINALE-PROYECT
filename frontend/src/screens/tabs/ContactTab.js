@@ -1,181 +1,105 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import Icon from 'react-native-vector-icons/Ionicons';
 
-export default function ContactTab({ formData = { email: '' }, updateFormData = () => {} }) {
-  // Validate email format including @ and domain
-  const validateEmail = (email) => {
-    if (!email || email.trim() === '') {
-      Alert.alert('Error', 'Email cannot be empty');
-      return false;
-    }
-
-    if (!email.includes('@')) {
-      Alert.alert('Error', 'Email must contain @');
-      return false;
-    }
-
-    const emailParts = email.split('@');
-    if (emailParts.length !== 2) {
-      Alert.alert('Error', 'Invalid email format');
-      return false;
-    }
-
-    const domain = emailParts[1];
-    if (!domain.includes('.')) {
-      Alert.alert('Error', 'Domain must contain a dot (.)');
-      return false;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      Alert.alert('Error', 'Invalid email format');
-      return false;
-    }
-
-    return true;
-  };
-
-  const handleEmailChange = (text) => {
-    updateFormData('email', text);
-  };
-
-  const handleValidation = () => {
-    if (validateEmail(formData.email)) {
-      Alert.alert('Success', 'Valid email format ✓');
-    }
-  };
-
+export default function ContactTab({ formData = { email: '', phone: '' }, rating }) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Contact Information</Text>
+      <Text style={styles.title}>Información de Contacto</Text>
 
-      {/* Email Field */}
+      {/* Email — immutable after registration */}
       <View style={styles.field}>
-        <Text style={styles.label}>Email Address *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="example@domain.com"
-          value={formData.email}
-          onChangeText={handleEmailChange}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          placeholderTextColor="#999"
-        />
+        <Text style={styles.label}>Correo electrónico</Text>
+        <View style={styles.readonlyBox}>
+          <Icon name="mail-outline" size={18} color="#666" style={styles.fieldIcon} />
+          <Text style={styles.readonlyText}>{formData.email || '—'}</Text>
+          <View style={styles.lockBadge}>
+            <Icon name="lock-closed" size={12} color="#888" />
+          </View>
+        </View>
         <Text style={styles.hint}>
-          Must include @ and a valid domain (e.g., .com, .es, .co)
+          El correo no puede modificarse. Es el identificador de tu cuenta.
         </Text>
       </View>
 
-      {/* Validation Button */}
-      <TouchableOpacity
-        style={styles.validateButton}
-        onPress={handleValidation}
-      >
-        <Text style={styles.validateButtonText}>Validate Email</Text>
-      </TouchableOpacity>
-
-      {/* Info Box */}
-      <View style={styles.infoBox}>
-        <Text style={styles.infoTitle}>Email Validation Rules</Text>
-        <Text style={styles.infoText}>✓ Must contain @</Text>
-        <Text style={styles.infoText}>✓ Must contain a valid domain</Text>
-        <Text style={styles.infoText}>✓ Cannot be empty</Text>
+      {/* Phone — display only (editable via Personal tab) */}
+      <View style={styles.field}>
+        <Text style={styles.label}>Teléfono</Text>
+        <View style={styles.readonlyBox}>
+          <Icon name="call-outline" size={18} color="#666" style={styles.fieldIcon} />
+          <Text style={styles.readonlyText}>{formData.phone || '—'}</Text>
+        </View>
+        <Text style={styles.hint}>Para cambiar el teléfono ve a la pestaña Personal.</Text>
       </View>
 
-      <TouchableOpacity style={styles.submitButton}>
-        <Text style={styles.submitButtonText}>Save Contact Info</Text>
-      </TouchableOpacity>
+      {/* Rating */}
+      {rating != null && (
+        <View style={styles.field}>
+          <Text style={styles.label}>Tu calificación</Text>
+          <View style={styles.ratingBox}>
+            {[1, 2, 3, 4, 5].map(star => (
+              <Icon
+                key={star}
+                name="star"
+                size={28}
+                color={star <= Math.round(rating) ? '#FF9500' : '#ddd'}
+              />
+            ))}
+            <Text style={styles.ratingNum}>{Number(rating).toFixed(1)}</Text>
+          </View>
+          <Text style={styles.hint}>
+            Calculada automáticamente a partir de los viajes completados.
+          </Text>
+        </View>
+      )}
+
+      {/* Info box */}
+      <View style={styles.infoBox}>
+        <Text style={styles.infoTitle}>Seguridad de tu cuenta</Text>
+        <Text style={styles.infoText}>
+          <Icon name="checkmark-circle" size={13} color="#007AFF" /> Autenticación via Firebase
+        </Text>
+        <Text style={styles.infoText}>
+          <Icon name="checkmark-circle" size={13} color="#007AFF" /> Contraseña cifrada
+        </Text>
+        <Text style={styles.infoText}>
+          <Icon name="checkmark-circle" size={13} color="#007AFF" /> Token renovado automáticamente
+        </Text>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    backgroundColor: '#fff',
+  container: { flex: 1, paddingHorizontal: 20, paddingTop: 10, backgroundColor: '#fff' },
+  title:     { fontSize: 18, fontWeight: 'bold', marginBottom: 20, color: '#000' },
+  field:     { marginBottom: 20 },
+  label:     { fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 8 },
+  hint:      { fontSize: 12, color: '#999', marginTop: 6, fontStyle: 'italic' },
+
+  readonlyBox: {
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1, borderColor: '#ddd', borderRadius: 8,
+    paddingHorizontal: 12, paddingVertical: 12, backgroundColor: '#f9f9f9',
   },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#000',
+  fieldIcon:    { marginRight: 10 },
+  readonlyText: { flex: 1, fontSize: 14, color: '#555' },
+  lockBadge: {
+    backgroundColor: '#eee', borderRadius: 12,
+    padding: 4, alignItems: 'center', justifyContent: 'center',
   },
-  field: {
-    marginBottom: 18,
+
+  ratingBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingVertical: 8,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: '#000',
-    backgroundColor: '#f9f9f9',
-  },
-  hint: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 6,
-    fontStyle: 'italic',
-  },
-  validateButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  validateButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  ratingNum: { fontSize: 22, fontWeight: '800', color: '#1a1a1a', marginLeft: 8 },
+
   infoBox: {
-    backgroundColor: '#E3F2FD',
-    borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
-    padding: 12,
-    borderRadius: 6,
-    marginBottom: 20,
+    backgroundColor: '#E3F2FD', borderLeftWidth: 4,
+    borderLeftColor: '#007AFF', padding: 14,
+    borderRadius: 8, marginTop: 8, gap: 6,
   },
-  infoTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#007AFF',
-    marginBottom: 8,
-  },
-  infoText: {
-    fontSize: 12,
-    color: '#333',
-    marginBottom: 4,
-  },
-  submitButton: {
-    backgroundColor: '#34C759',
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 30,
-  },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  infoTitle: { fontSize: 13, fontWeight: '700', color: '#007AFF', marginBottom: 6 },
+  infoText:  { fontSize: 12, color: '#333' },
 });
