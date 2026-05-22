@@ -2,29 +2,33 @@ const mongoose = require('mongoose');
 const validator = require('validator');
 const { z } = require('zod');
 
+/**
+ * User persistence schema.
+ * Supports both passengers and drivers.
+ */
 const userSchema = new mongoose.Schema({
   fullName: {
     type: String,
-    required: [true, 'El nombre completo es obligatorio'],
+    required: [true, 'Full name is required'],
     trim: true
   },
   email: {
     type: String,
-    required: [true, 'El correo electrónico es obligatorio'],
+    required: [true, 'Email is required'],
     unique: true,
     lowercase: true,
     trim: true,
-    validate: [validator.isEmail, 'Por favor, proporcione un correo electrónico válido']
+    validate: [validator.isEmail, 'Invalid email format']
   },
   phone: {
     type: String,
-    required: [true, 'El número de teléfono es obligatorio'],
+    required: [true, 'Phone number is required'],
     trim: true
   },
   gender: {
     type: String,
     enum: ['male', 'female', 'other'],
-    required: [true, 'El género es obligatorio']
+    required: [true, 'Gender is required']
   },
   language: {
     type: String,
@@ -42,7 +46,7 @@ const userSchema = new mongoose.Schema({
   },
   firebaseUid: {
     type: String,
-    required: [true, 'El UID de Firebase es obligatorio'],
+    required: [true, 'Firebase UID is required'],
     unique: true
   },
   rating: {
@@ -54,16 +58,23 @@ const userSchema = new mongoose.Schema({
   isOnline: {
     type: Boolean,
     default: false
+  },
+  stripeCustomerId: {
+    type: String,
+    default: null
   }
 }, {
   timestamps: true
 });
 
-// Zod Schema para validación de entrada (Request Body)
+/**
+ * Request validation schema.
+ * Enforces data integrity before processing the business logic.
+ */
 const userValidationSchema = z.object({
-  fullName: z.string().min(3, 'El nombre debe tener al menos 3 caracteres'),
-  email: z.string().email('Email inválido'),
-  phone: z.string().min(7, 'Teléfono inválido'),
+  fullName: z.string().min(3, 'Name too short'),
+  email: z.string().email('Invalid email'),
+  phone: z.string().min(7, 'Invalid phone number'),
   gender: z.enum(['male', 'female', 'other']),
   language: z.enum(['ES', 'EN']).optional(),
   firebaseUid: z.string(),

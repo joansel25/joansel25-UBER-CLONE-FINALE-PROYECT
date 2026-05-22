@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');
 const { z } = require('zod');
 
+/**
+ * Driver extension schema.
+ * Linked to a base User, adds vehicle and geospatial data.
+ */
 const driverSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
@@ -44,10 +48,12 @@ const driverSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Índice para búsquedas geoespaciales
+// Spatial index for proximity searches (find nearest drivers)
 driverSchema.index({ currentLocation: '2dsphere' });
 
-// Zod Schema para validación de entrada
+/**
+ * Driver onboarding validation.
+ */
 const driverValidationSchema = z.object({
   userId: z.string(),
   vehicleInfo: z.object({

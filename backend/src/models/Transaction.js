@@ -1,5 +1,9 @@
 const mongoose = require('mongoose');
 
+/**
+ * Financial ledger.
+ * Audit trail for all platform payments.
+ */
 const transactionSchema = new mongoose.Schema({
   trip: {
     type: mongoose.Schema.Types.ObjectId,
@@ -17,7 +21,7 @@ const transactionSchema = new mongoose.Schema({
   },
   currency: {
     type: String,
-    default: 'USD'
+    default: 'COP'
   },
   status: {
     type: String,
@@ -25,7 +29,8 @@ const transactionSchema = new mongoose.Schema({
     default: 'pending'
   },
   paymentId: {
-    type: String // ID de Stripe/MercadoPago
+    // External gateway ID (Stripe/MercadoPago)
+    type: String
   },
   paymentMethod: {
     type: String,
