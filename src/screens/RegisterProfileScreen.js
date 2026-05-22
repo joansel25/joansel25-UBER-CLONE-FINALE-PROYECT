@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useNavigation } from '@react-navigation/native';
+import { saveUser } from '../storage/FirestoreServices';
 
 import PersonalInfoTab from './tabs/PersonalInfoTab';
 import ContactTab from './tabs/ContactTab';
 import PreferencesTab from './tabs/PreferencesTab';
 
 export default function RegisterProfileScreen() {
+  const navigation = useNavigation();
   // Local state to manage active tab and form data
   const [activeTab, setActiveTab] = useState('personal');
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
@@ -29,6 +33,40 @@ export default function RegisterProfileScreen() {
       ...prev,
       [key]: value
     }));
+  };
+
+  const handleSaveUser = async () => {
+    // Validar campos obligatorios
+    if (!formData.fullName || !formData.phone || !formData.email || !formData.gender) {
+      Alert.alert('Error', 'Por favor completa todos los campos requeridos (*)');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Usar email como userId (puedes usar auth también)
+      const result = await saveUser(formData.email, {
+        fullName: formData.fullName,
+        phone: formData.phone,
+        email: formData.email,
+        gender: formData.gender,
+        language: formData.language,
+        photo: formData.photo,
+        createdAt: new Date().toISOString(),
+      });
+
+      if (result.success) {
+        Alert.alert('Éxito', 'Perfil guardado correctamente');
+        // Navegar a la siguiente pantalla
+        navigation.navigate('Home');
+      } else {
+        Alert.alert('Error', result.message);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Error al guardar el perfil: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const tabs = [
@@ -97,6 +135,21 @@ export default function RegisterProfileScreen() {
           />
         )}
       </ScrollView>
+
+      {/* Save Button */}
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity 
+          style={[styles.saveButton, loading && styles.saveButtonDisabled]}
+          onPress={handleSaveUser}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.saveButtonText}>Save Profile</Text>
+          )}
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -158,5 +211,25 @@ const styles = StyleSheet.create({
   },
   tabContent: {
     flex: 1,
+  },
+  buttonContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    paddingTop: 10,
+  },
+  saveButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

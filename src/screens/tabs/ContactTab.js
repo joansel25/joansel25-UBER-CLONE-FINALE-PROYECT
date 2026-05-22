@@ -1,14 +1,7 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, } from 'react-native';
 
-export default function ContactTab({ formData = { email: '' }, updateFormData = () => {} }) {
+export default function ContactTab({ formData = { email: '' }, updateFormData = () => { } }) {
   // Validate email format including @ and domain
   const validateEmail = (email) => {
     if (!email || email.trim() === '') {
@@ -56,7 +49,7 @@ export default function ContactTab({ formData = { email: '' }, updateFormData = 
     <View style={styles.container}>
       <Text style={styles.title}>Contact Information</Text>
 
-      {/* Email Field */}
+
       <View style={styles.field}>
         <Text style={styles.label}>Email Address *</Text>
         <TextInput
@@ -73,7 +66,7 @@ export default function ContactTab({ formData = { email: '' }, updateFormData = 
         </Text>
       </View>
 
-      {/* Validation Button */}
+     
       <TouchableOpacity
         style={styles.validateButton}
         onPress={handleValidation}
@@ -81,7 +74,7 @@ export default function ContactTab({ formData = { email: '' }, updateFormData = 
         <Text style={styles.validateButtonText}>Validate Email</Text>
       </TouchableOpacity>
 
-      {/* Info Box */}
+     
       <View style={styles.infoBox}>
         <Text style={styles.infoTitle}>Email Validation Rules</Text>
         <Text style={styles.infoText}>✓ Must contain @</Text>
