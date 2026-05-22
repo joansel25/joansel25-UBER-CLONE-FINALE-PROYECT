@@ -1,0 +1,186 @@
+const Trip = require('../models/Trip');
+const { User } = require('../models/User');
+
+/**
+ * Business logic for the trip lifecycle.
+ * Controllers call these methods; they never touch HTTP objects.
+ */
+class TripService {
+
+  /**
+   * Persists a new trip in 'requested' status.
+   */
+  async createTrip({ passengerId, origin, destination, vehicleCategory, paymentMethod, fare, distanceKm, durationMin, polyline }) {
+    const trip = await Trip.create({
+      passenger:       passengerId,
+      origin: {
+        address:  origin.address,
+        location: { type: 'Point', coordinates: [origin.lng, origin.lat] },
+      },
+      destination: {
+        address:  destination.address,
+        location: { type: 'Point', coordinates: [destination.lng, destination.lat] },
+      },
+      vehicleCategory,
+      paymentMethod: paymentMethod || 'cash',
+      fare,
+      distance: distanceKm,
+      duration: durationMin,
+      polyline,
+      status: 'requested',
+    });
+
+    return trip;
+  }
+
+  /**
+   * Returns all trips for a user, newest first, paginated.
+   * Works for both passenger and driver roles.
+   */
+  async getUserTrips(userId, { page = 1, limit = 10 } = {}) {
+    const skip = (page - 1) * limit;
+
+    const [trips, total] = await Promise.all([
+      Trip.find({ $or: [{ passenger: userId }, { driver: userId }] })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('passenger', 'fullName phone profilePic rating')
+        .populate('driver',    'fullName phone profilePic rating'),
+      Trip.countDocuments({ $or: [{ passenger: userId }, { driver: userId }] }),
+    ]);
+
+    return { trips, total, page, pages: Math.ceil(total / limit) };
+  }
+
+  /**
+   * Returns a single trip by ID.
+   * Throws 404 if not found.
+   */
+  async getTripById(tripId) {
+    const trip = await Trip.findById(tripId)
+      .populate('passenger', 'fullName phone profilePic rating')
+      .populate('driver',    'fullName phone profilePic rating');
+
+    if (!trip) {
+      const err = new Error('Trip not found');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    return trip;
+  }
+
+  /**
+   * Driver accepts a requested trip.
+   */
+  async acceptTrip(tripId, driverId) {
+    const trip = await Trip.findById(tripId);
+    if (!trip) {
+      const err = new Error('Trip not found');
+      err.statusCode = 404;
+      throw err;
+    }
+    if (trip.status !== 'requested') {
+      const err = new Error(`Cannot accept a trip with status '${trip.status}'`);
+      err.statusCode = 409;
+      throw err;
+    }
+
+    trip.driver     = driverId;
+    trip.status     = 'accepted';
+    trip.acceptedAt = new Date();
+    await trip.save();
+
+    return trip.populate(['passenger', 'driver']);
+  }
+
+  /**
+   * Driver starts an accepted trip.
+   */
+  async startTrip(tripId, driverId) {
+    const trip = await Trip.findById(tripId);
+    if (!trip) {
+      const err = new Error('Trip not found');
+      err.statusCode = 404;
+      throw err;
+    }
+    if (trip.status !== 'accepted') {
+      const err = new Error(`Cannot start a trip with status '${trip.status}'`);
+      err.statusCode = 409;
+      throw err;
+    }
+    if (trip.driver.toString() !== driverId.toString()) {
+      const err = new Error('Only the assigned driver can start this trip');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    trip.status    = 'ongoing';
+    trip.startedAt = new Date();
+    await trip.save();
+
+    return trip;
+  }
+
+  /**
+   * Driver completes an ongoing trip.
+   */
+  async completeTrip(tripId, driverId) {
+    const trip = await Trip.findById(tripId);
+    if (!trip) {
+      const err = new Error('Trip not found');
+      err.statusCode = 404;
+      throw err;
+    }
+    if (trip.status !== 'ongoing') {
+      const err = new Error(`Cannot complete a trip with status '${trip.status}'`);
+      err.statusCode = 409;
+      throw err;
+    }
+    if (trip.driver.toString() !== driverId.toString()) {
+      const err = new Error('Only the assigned driver can complete this trip');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    trip.status      = 'completed';
+    trip.completedAt = new Date();
+    await trip.save();
+
+    return trip;
+  }
+
+  /**
+   * Cancels a trip. Allowed while status is 'requested' or 'accepted'.
+   */
+  async cancelTrip(tripId, userId) {
+    const trip = await Trip.findById(tripId);
+    if (!trip) {
+      const err = new Error('Trip not found');
+      err.statusCode = 404;
+      throw err;
+    }
+    if (!['requested', 'accepted'].includes(trip.status)) {
+      const err = new Error(`Cannot cancel a trip with status '${trip.status}'`);
+      err.statusCode = 409;
+      throw err;
+    }
+
+    const isPassenger = trip.passenger.toString() === userId.toString();
+    const isDriver    = trip.driver && trip.driver.toString() === userId.toString();
+
+    if (!isPassenger && !isDriver) {
+      const err = new Error('Not authorized to cancel this trip');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    trip.status = 'cancelled';
+    await trip.save();
+
+    return trip;
+  }
+}
+
+module.exports = new TripService();

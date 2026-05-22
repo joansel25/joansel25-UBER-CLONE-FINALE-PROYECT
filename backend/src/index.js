@@ -16,8 +16,9 @@ app.use(express.json());
 app.use(morgan('dev'));
 
 // Routing
-app.use('/api/users', require('./routes/userRoutes'));
+app.use('/api/users',   require('./routes/userRoutes'));
 app.use('/api/drivers', require('./routes/driverRoutes'));
+app.use('/api/trips',   require('./routes/tripRoutes'));
 
 // 404 fallback
 app.use((req, res, next) => {

@@ -1,4 +1,5 @@
 const driverService = require('../services/driverService');
+const geoService = require('../services/geoService');
 const { driverValidationSchema } = require('../models/Driver');
 const { z } = require('zod');
 
@@ -36,7 +37,7 @@ class DriverController {
    */
   async updateStatus(req, res, next) {
     try {
-      // Create a specific validation schema for status update
+      //  validation schema for status update
       const statusSchema = z.object({
         driverId: z.string(),
         status: z.enum(['available', 'busy', 'offline'])
@@ -60,7 +61,7 @@ class DriverController {
    */
   async updateLocation(req, res, next) {
     try {
-      // Create a specific validation schema for location update
+      //  validation schema for location update
       const locationSchema = z.object({
         driverId: z.string(),
         longitude: z.number().min(-180).max(180),
@@ -74,6 +75,38 @@ class DriverController {
       res.status(200).json({
         success: true,
         data: updatedDriver
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Retrieves available drivers close to a geographical point.
+   */
+  async getNearbyDrivers(req, res, next) {
+    try {
+      // 1. Validate query parameters (coercing strings to numbers)
+      const nearbySchema = z.object({
+        longitude: z.coerce.number().min(-180).max(180),
+        latitude: z.coerce.number().min(-90).max(90),
+        maxDistance: z.coerce.number().positive().optional(),
+        limit: z.coerce.number().int().positive().optional()
+      });
+
+      const { longitude, latitude, maxDistance, limit } = nearbySchema.parse(req.query);
+
+      // 2. Delegate to GeoService
+      const drivers = await geoService.findNearbyDrivers(longitude, latitude, {
+        maxDistance,
+        limit
+      });
+
+      // 3. Return results
+      res.status(200).json({
+        success: true,
+        count: drivers.length,
+        data: drivers
       });
     } catch (error) {
       next(error);
