@@ -3,6 +3,7 @@ const path = require('path');
 
 
 const initializeFirebase = () => {
+  if (admin.apps.length) return; // already initialized
   try {
 
     const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || './config/firebase-service-account.json';
@@ -11,8 +12,8 @@ const initializeFirebase = () => {
 
 
     admin.initializeApp({
-      credential: admin.credential.cert(resolvedPath),
-      // databaseURL: "https://<TU-PROYECTO>.firebaseio.com" // Opcional, solo si usas Realtime DB desde el Admin
+      credential:  admin.credential.cert(resolvedPath),
+      databaseURL: process.env.FIREBASE_REALTIME_DB_URL,
     });
 
     console.log('✅ Firebase Admin SDK inicializado correctamente.');

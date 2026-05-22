@@ -1,5 +1,6 @@
 const driverService = require('../services/driverService');
 const geoService = require('../services/geoService');
+const trackingService = require('../services/trackingService');
 const { driverValidationSchema } = require('../models/Driver');
 const { z } = require('zod');
 
@@ -61,21 +62,34 @@ class DriverController {
    */
   async updateLocation(req, res, next) {
     try {
-      //  validation schema for location update
       const locationSchema = z.object({
-        driverId: z.string(),
+        driverId:  z.string(),
         longitude: z.number().min(-180).max(180),
-        latitude: z.number().min(-90).max(90)
+        latitude:  z.number().min(-90).max(90),
+        tripId:    z.string().optional(),
       });
 
-      const { driverId, longitude, latitude } = locationSchema.parse(req.body);
+      const { driverId, longitude, latitude, tripId } = locationSchema.parse(req.body);
 
-      const updatedDriver = await driverService.updateLocation(driverId, longitude, latitude);
+      const [updatedDriver] = await Promise.all([
+        driverService.updateLocation(driverId, longitude, latitude),
+        trackingService.updateDriverLocation(driverId, latitude, longitude, tripId),
+      ]);
 
-      res.status(200).json({
-        success: true,
-        data: updatedDriver
-      });
+      res.status(200).json({ success: true, data: updatedDriver });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/drivers/:id
+   * Returns a driver profile with vehicle info and populated user data.
+   */
+  async getById(req, res, next) {
+    try {
+      const driver = await driverService.getDriverById(req.params.id);
+      res.status(200).json({ success: true, data: driver });
     } catch (error) {
       next(error);
     }

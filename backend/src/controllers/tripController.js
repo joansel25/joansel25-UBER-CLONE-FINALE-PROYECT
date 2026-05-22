@@ -39,9 +39,50 @@ async function resolveUser(firebaseUid) {
   return user;
 }
 
+const estimateSchema = z.object({
+  originLat:  z.coerce.number().min(-90).max(90),
+  originLng:  z.coerce.number().min(-180).max(180),
+  destLat:    z.coerce.number().min(-90).max(90),
+  destLng:    z.coerce.number().min(-180).max(180),
+});
+
 // ── Controller ─────────────────────────────────────────────────────────────
 
 class TripController {
+
+  /**
+   * GET /api/trips/estimate
+   * Returns route info and fare estimates for all 3 vehicle categories.
+   * Called before creating a trip so the user can choose a category.
+   *
+   * Query params: originLat, originLng, destLat, destLng
+   */
+  async estimate(req, res, next) {
+    try {
+      const { originLat, originLng, destLat, destLng } = estimateSchema.parse(req.query);
+
+      const result = await mapsService.getTripEstimate(
+        [originLat, originLng],
+        [destLat,   destLng]
+      );
+
+      res.status(200).json({
+        success: true,
+        data: {
+          route: {
+            distanceText:  result.route.distanceText,
+            durationText:  result.route.durationText,
+            distanceMeters: result.route.distanceMeters,
+            durationSeconds: result.route.durationSeconds,
+            polyline:      result.route.polyline,
+          },
+          fares: result.fares,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 
   /**
    * POST /api/trips
@@ -190,6 +231,23 @@ class TripController {
     try {
       const user = await resolveUser(req.user.uid);
       const trip = await tripService.cancelTrip(req.params.id, user._id);
+      res.status(200).json({ success: true, data: trip });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * PATCH /api/trips/:id/rate
+   * Passenger rates driver or driver rates passenger after trip completion.
+   * Body: { rating: 1–5 }
+   */
+  async rate(req, res, next) {
+    try {
+      const rateSchema = z.object({ rating: z.number().int().min(1).max(5) });
+      const { rating } = rateSchema.parse(req.body);
+      const user = await resolveUser(req.user.uid);
+      const trip = await tripService.rateTrip(req.params.id, user._id, rating);
       res.status(200).json({ success: true, data: trip });
     } catch (error) {
       next(error);

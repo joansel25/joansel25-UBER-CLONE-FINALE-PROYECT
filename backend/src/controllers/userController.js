@@ -25,24 +25,26 @@ class UserController {
   }
  
  
-  //Retrieves authenticated user profile.
-
   async getProfile(req, res, next) {
     try {
-      // req.user is populated by protect middleware
       const user = await userService.getUserByFirebaseUid(req.user.uid);
-
       if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: 'User record not found'
-        });
+        return res.status(404).json({ success: false, message: 'User record not found' });
       }
+      res.status(200).json({ success: true, data: user });
+    } catch (error) {
+      next(error);
+    }
+  }
 
-      res.status(200).json({
-        success: true,
-        data: user
-      });
+  /**
+   * PATCH /api/users/profile
+   * Updates mutable profile fields: fullName, phone, language, profilePic.
+   */
+  async updateProfile(req, res, next) {
+    try {
+      const user = await userService.updateProfile(req.user.uid, req.body);
+      res.status(200).json({ success: true, data: user });
     } catch (error) {
       next(error);
     }

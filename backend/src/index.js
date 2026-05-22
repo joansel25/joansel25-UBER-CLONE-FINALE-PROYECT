@@ -10,15 +10,21 @@ const errorHandler = require('./middleware/errorMiddleware');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Base middleware stack
+// Stripe webhook must receive the raw body for signature verification.
+// Mount it BEFORE express.json() strips the raw bytes.
 app.use(cors());
+app.use('/api/webhooks', require('./routes/webhookRoutes'));
+
+// Base middleware stack
 app.use(express.json());
 app.use(morgan('dev'));
 
 // Routing
-app.use('/api/users',   require('./routes/userRoutes'));
-app.use('/api/drivers', require('./routes/driverRoutes'));
-app.use('/api/trips',   require('./routes/tripRoutes'));
+app.use('/api/users',    require('./routes/userRoutes'));
+app.use('/api/drivers',  require('./routes/driverRoutes'));
+app.use('/api/trips',    require('./routes/tripRoutes'));
+app.use('/api/places',   require('./routes/placesRoutes'));
+app.use('/api/payments', require('./routes/paymentRoutes'));
 
 // 404 fallback
 app.use((req, res, next) => {

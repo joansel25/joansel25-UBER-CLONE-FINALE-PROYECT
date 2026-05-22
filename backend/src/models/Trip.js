@@ -52,7 +52,19 @@ const tripSchema = new mongoose.Schema({
   polyline: String, // Map route path
   acceptedAt: Date,
   startedAt: Date,
-  completedAt: Date
+  completedAt: Date,
+  passengerRatingDriver: {
+    type: Number,
+    min: 1,
+    max: 5,
+    default: null
+  },
+  driverRatingPassenger: {
+    type: Number,
+    min: 1,
+    max: 5,
+    default: null
+  }
 }, {
   timestamps: true
 });

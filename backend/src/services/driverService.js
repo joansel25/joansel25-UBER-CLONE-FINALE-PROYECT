@@ -43,6 +43,20 @@ class DriverService {
   }
 
   /**
+   * Returns a driver profile with populated user data.
+   */
+  async getDriverById(driverId) {
+    const driver = await Driver.findById(driverId)
+      .populate('user', 'fullName email phone profilePic rating');
+    if (!driver) {
+      const err = new Error('Driver not found');
+      err.statusCode = 404;
+      throw err;
+    }
+    return driver;
+  }
+
+  /**
    * Updates the availability status of a driver.
    */
   async updateStatus(driverId, status) {

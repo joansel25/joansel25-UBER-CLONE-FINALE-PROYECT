@@ -9,7 +9,8 @@ const { protect } = require('../middleware/auth');
  */
 
 // Onboarding & Profile
-router.post('/register', protect, userController.register);
-router.get('/profile', protect, userController.getProfile);
+router.post('/register',   protect, userController.register);
+router.get('/profile',     protect, userController.getProfile);
+router.patch('/profile',   protect, userController.updateProfile);
 
 module.exports = router;

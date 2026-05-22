@@ -7,9 +7,10 @@ const { protect } = require('../middleware/auth');
 // e.g., router.post('/register', authMiddleware, driverController.register);
 
 
-router.get('/nearby', protect, driverController.getNearbyDrivers);
-router.post('/register', driverController.register);
-router.patch('/status', driverController.updateStatus);
-router.patch('/location', driverController.updateLocation);
+router.get('/nearby',      protect, driverController.getNearbyDrivers);
+router.get('/:id',         protect, driverController.getById);
+router.post('/register',            driverController.register);
+router.patch('/status',             driverController.updateStatus);
+router.patch('/location',           driverController.updateLocation);
 
 module.exports = router;

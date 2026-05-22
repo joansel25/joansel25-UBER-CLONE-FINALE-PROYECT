@@ -21,8 +21,10 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
-# Test scripts (local dev only, not for production)
-test_*.js
+
+# Test scripts — local only, not for deployment
+backend/test_*.js
+
 
 # Root level project files to ignore
 ../gpbus_uber_clone_sprint_plan.html
