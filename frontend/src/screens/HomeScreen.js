@@ -120,7 +120,7 @@ export default function HomeScreen({ navigation }) {
         destLat:   dest.lat,
         destLng:   dest.lng,
       });
-      setEstimate(estimateResult.data);
+      setEstimate(estimateResult.data.data);
 
       // 3. Fit map to show both markers
       mapRef.current?.fitToCoordinates(
@@ -162,8 +162,9 @@ export default function HomeScreen({ navigation }) {
         paymentMethod:   'card',
       });
 
-      dispatch(setActiveTrip(result.data));
-      navigation.navigate('FollowTravel', { tripId: result.data._id });
+      const newTrip = result.data.data.trip;
+      dispatch(setActiveTrip(newTrip));
+      navigation.navigate('FollowTravel', { tripId: newTrip._id });
     } catch (error) {
       Alert.alert('Error', error.message || 'No se pudo crear el viaje. Intenta de nuevo.');
       setStep(STEP.READY);
