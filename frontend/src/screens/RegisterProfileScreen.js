@@ -18,7 +18,7 @@ const TABS = [
   { id: 'preferences',  label: 'Ajustes',  icon: 'settings' },
 ];
 
-export default function RegisterProfileScreen() {
+export default function RegisterProfileScreen({ navigation }) {
   const { dbUser, signOut, refreshUser } = useAuth();
 
   const [activeTab, setActiveTab] = useState('personal');
@@ -94,6 +94,18 @@ export default function RegisterProfileScreen() {
           </TouchableOpacity>
         </View>
         <Text style={styles.headerSubtitle}>Los campos con * son obligatorios</Text>
+
+        {/* Wallet shortcut — passengers only */}
+        {dbUser?.role !== 'driver' && (
+          <TouchableOpacity
+            style={styles.walletRow}
+            onPress={() => navigation.navigate('PaymentMethods')}
+          >
+            <Icon name="card-outline" size={18} color="#007AFF" />
+            <Text style={styles.walletText}>Métodos de pago</Text>
+            <Icon name="chevron-forward" size={16} color="#666" style={{ marginLeft: 'auto' }} />
+          </TouchableOpacity>
+        )}
         {isSaving && (
           <View style={styles.savingRow}>
             <ActivityIndicator size="small" color="#007AFF" />
@@ -166,6 +178,12 @@ const styles = StyleSheet.create({
   headerSubtitle: { fontSize: 14, color: '#666', marginTop: 6 },
   savingRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   savingText:  { fontSize: 13, color: '#007AFF' },
+  walletRow:   {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginTop: 10, paddingVertical: 10, paddingHorizontal: 12,
+    backgroundColor: '#F0F6FF', borderRadius: 10,
+  },
+  walletText:  { fontSize: 14, fontWeight: '600', color: '#007AFF' },
   tabWrapper:  { paddingHorizontal: 20, marginBottom: 10 },
   tabContainer: {
     flexDirection: 'row', backgroundColor: '#f0f0f0', borderRadius: 12, padding: 4,
