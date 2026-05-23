@@ -53,7 +53,7 @@ export default function DriverHomeScreen() {
     (async () => {
       try {
         const res = await driverApi.getMe();
-        const doc = res.data.data;
+        const doc = res.data;
         setDriverDoc(doc);
         setDriverStatus(doc.status);
       } catch (err) {
@@ -100,7 +100,7 @@ export default function DriverHomeScreen() {
   const fetchAvailableTrips = useCallback(async () => {
     try {
       const res = await tripApi.getAvailable({ limit: 10 });
-      setAvailableTrips(res.data.trips ?? []);
+      setAvailableTrips(res.trips ?? []);
     } catch { /* silent */ }
   }, []);
 
@@ -119,7 +119,7 @@ export default function DriverHomeScreen() {
   const pollActiveTrip = useCallback(async (tripId) => {
     try {
       const res = await tripApi.getById(tripId);
-      return res.data.data;
+      return res.data;
     } catch { return null; }
   }, []);
 
@@ -155,7 +155,7 @@ export default function DriverHomeScreen() {
     setError('');
     try {
       const res = await tripApi.accept(trip._id, dbUser._id);
-      const accepted = res.data.data;
+      const accepted = res.data;
       setActiveTrip(accepted);
       setTripPhase('accepted');
       stopTripsPoll();

@@ -40,7 +40,7 @@ export default function TravelHistory({ navigation }) {
   const fetchTrips = useCallback(async (pageNum = 1, append = false) => {
     try {
       const res = await tripApi.getHistory({ page: pageNum, limit: 10 });
-      const { trips: newTrips, pages } = res.data;
+      const { trips: newTrips, pages } = res;
       setTrips(prev => append ? [...prev, ...newTrips] : newTrips);
       setHasMore(pageNum < pages);
       setPage(pageNum);

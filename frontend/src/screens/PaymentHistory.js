@@ -30,7 +30,7 @@ export default function PaymentHistory({ navigation }) {
   const fetchTx = useCallback(async (pageNum = 1, append = false) => {
     try {
       const res = await paymentApi.list({ page: pageNum, limit: 15 });
-      const { transactions: newTx, pages } = res.data;
+      const { transactions: newTx, pages } = res;
       setTransactions(prev => append ? [...prev, ...newTx] : newTx);
       setHasMore(pageNum < pages);
       setPage(pageNum);

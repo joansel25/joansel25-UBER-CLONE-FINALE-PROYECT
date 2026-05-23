@@ -33,7 +33,7 @@ export default function PaymentMethodsScreen({ navigation }) {
     setLoading(true);
     try {
       const res = await paymentApi.listCards();
-      setCards(res.data.data ?? []);
+      setCards(res.data ?? []);
     } catch {
       setError('No se pudieron cargar tus métodos de pago.');
     } finally {
@@ -50,7 +50,7 @@ export default function PaymentMethodsScreen({ navigation }) {
     try {
       // 1. Get SetupIntent client secret from backend
       const res = await paymentApi.setupCard();
-      const { clientSecret } = res.data.data;
+      const { clientSecret } = res.data;
 
       // 2. Initialize Stripe PaymentSheet in SetupIntent mode
       const { error: initError } = await initPaymentSheet({

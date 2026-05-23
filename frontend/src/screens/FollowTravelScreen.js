@@ -75,7 +75,7 @@ export default function FollowTravelScreen({ route, navigation }) {
     if (trip?.status === 'completed' && trip?.paymentMethod === 'card' && !payDone) {
       paymentApi.listCards()
         .then(res => {
-          const cards = res.data.data ?? [];
+          const cards = res.data ?? [];
           setSavedCards(cards);
           if (cards.length > 0) setSelectedCardId(cards[0].id);
         })
@@ -128,7 +128,7 @@ export default function FollowTravelScreen({ route, navigation }) {
     setPayError('');
     try {
       const res = await paymentApi.createIntent(tripId, selectedCardId);
-      const { clientSecret } = res.data.data;
+      const { clientSecret } = res.data;
 
       const { error: stripeErr } = await confirmPayment(clientSecret, {
         paymentMethodType: 'Card',
@@ -151,7 +151,7 @@ export default function FollowTravelScreen({ route, navigation }) {
     setPayError('');
     try {
       const res = await paymentApi.createIntent(tripId);
-      const { clientSecret } = res.data.data;
+      const { clientSecret } = res.data;
 
       const { error: initErr } = await initPaymentSheet({
         paymentIntentClientSecret: clientSecret,

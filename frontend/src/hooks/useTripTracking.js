@@ -53,7 +53,7 @@ export default function useTripTracking(tripId) {
     if (!tripId) return;
     try {
       const res = await tripApi.getById(tripId);
-      const t   = res.data.data;
+      const t   = res.data;
       setTrip(t);
       setError(null);
 

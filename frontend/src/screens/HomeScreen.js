@@ -120,7 +120,7 @@ export default function HomeScreen({ navigation }) {
         destLat:   dest.lat,
         destLng:   dest.lng,
       });
-      setEstimate(estimateResult.data.data);
+      setEstimate(estimateResult.data);
 
       // 3. Fit map to show both markers
       mapRef.current?.fitToCoordinates(
@@ -162,7 +162,7 @@ export default function HomeScreen({ navigation }) {
         paymentMethod:   'card',
       });
 
-      const newTrip = result.data.data.trip;
+      const newTrip = result.data.trip;
       dispatch(setActiveTrip(newTrip));
       navigation.navigate('FollowTravel', { tripId: newTrip._id });
     } catch (error) {

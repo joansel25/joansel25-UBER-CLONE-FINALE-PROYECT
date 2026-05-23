@@ -60,13 +60,13 @@ export default function TripDetailScreen({ route, navigation }) {
         const [tripRes] = await Promise.all([
           tripApi.getById(tripId),
         ]);
-        const t = tripRes.data.data;
+        const t = tripRes.data;
         setTrip(t);
 
         // Fetch transaction if trip was paid by card
         if (t.paymentMethod === 'card' && t.status === 'completed') {
           paymentApi.getByTrip(tripId)
-            .then(r => setTx(r.data.data))
+            .then(r => setTx(r.data))
             .catch(() => {});
         }
       } catch {

@@ -24,10 +24,9 @@ export function AuthProvider({ children }) {
           if (cached) setDbUser(JSON.parse(cached));
 
           // Always refresh from backend
-          const res = await userApi.getMe();
-          const userData = res.data.data;
-          setDbUser(userData);
-          await AsyncStorage.setItem(USER_KEY, JSON.stringify(userData));
+          const { data } = await userApi.getMe();
+          setDbUser(data);
+          await AsyncStorage.setItem(USER_KEY, JSON.stringify(data));
         } catch {
           // If backend call fails (e.g. user not registered yet), keep null
           setDbUser(null);
@@ -53,11 +52,10 @@ export function AuthProvider({ children }) {
   };
 
   const refreshUser = async () => {
-    const res = await userApi.getMe();
-    const userData = res.data.data;
-    setDbUser(userData);
-    await AsyncStorage.setItem(USER_KEY, JSON.stringify(userData));
-    return userData;
+    const { data } = await userApi.getMe();
+    setDbUser(data);
+    await AsyncStorage.setItem(USER_KEY, JSON.stringify(data));
+    return data;
   };
 
   return (
