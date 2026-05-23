@@ -187,4 +187,38 @@ async function getTripEstimate(origin, destination) {
   return { route, fares };
 }
 
-module.exports = { getPlacesAutocomplete, getDistanceMatrix, getDirections, calculateFare, getTripEstimate };
+/**
+ * Retrieves coordinates and formatted address for a given Place ID.
+ * Called when the user selects an autocomplete suggestion so the frontend
+ * can obtain the lat/lng needed for map markers and fare estimation.
+ *
+ * @param {string} placeId
+ * @param {string} [sessionToken]
+ * @returns {Promise<{ lat, lng, address, name }>}
+ */
+async function getPlaceDetails(placeId, sessionToken) {
+  const params = {
+    place_id: placeId,
+    fields:   ['geometry', 'formatted_address', 'name'],
+    key:      process.env.GOOGLE_MAPS_API_KEY,
+  };
+  if (sessionToken) params.sessiontoken = sessionToken;
+
+  const response = await client.placeDetails({ params });
+
+  if (response.data.status !== 'OK') {
+    const err = new Error(`Place Details API error: ${response.data.status}`);
+    err.statusCode = 502;
+    throw err;
+  }
+
+  const result = response.data.result;
+  return {
+    lat:     result.geometry.location.lat,
+    lng:     result.geometry.location.lng,
+    address: result.formatted_address,
+    name:    result.name,
+  };
+}
+
+module.exports = { getPlacesAutocomplete, getPlaceDetails, getDistanceMatrix, getDirections, calculateFare, getTripEstimate };
