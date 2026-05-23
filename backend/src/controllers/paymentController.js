@@ -28,6 +28,25 @@ const deleteCardSchema = z.object({
 class PaymentController {
 
   /**
+   * GET /api/payments
+   * Returns paginated transaction history for the authenticated user.
+   */
+  async listUserTransactions(req, res, next) {
+    try {
+      const pageSchema = z.object({
+        page:  z.coerce.number().int().positive().optional(),
+        limit: z.coerce.number().int().positive().max(50).optional(),
+      });
+      const { page, limit } = pageSchema.parse(req.query);
+      const passenger = await resolveUser(req.user.uid);
+      const result = await paymentService.getUserTransactions(passenger._id, { page, limit });
+      res.status(200).json({ success: true, ...result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * POST /api/payments/create-intent
    * Creates a Stripe PaymentIntent for a completed trip.
    * Returns clientSecret so the React Native app can confirm the payment.

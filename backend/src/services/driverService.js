@@ -1,5 +1,5 @@
 const { Driver } = require('../models/Driver');
-const User = require('../models/User');
+const { User } = require('../models/User');
 
 /**
  * Service to handle Driver specific business logic.
@@ -39,6 +39,10 @@ class DriverService {
     });
 
     await newDriver.save();
+
+    // Promote the user's role so the frontend routes them to the driver flow
+    await User.findByIdAndUpdate(userId, { role: 'driver' });
+
     return newDriver;
   }
 

@@ -95,16 +95,36 @@ export default function RegisterProfileScreen({ navigation }) {
         </View>
         <Text style={styles.headerSubtitle}>Los campos con * son obligatorios</Text>
 
-        {/* Wallet shortcut — passengers only */}
+        {/* Quick-action rows — passengers only */}
         {dbUser?.role !== 'driver' && (
-          <TouchableOpacity
-            style={styles.walletRow}
-            onPress={() => navigation.navigate('PaymentMethods')}
-          >
-            <Icon name="card-outline" size={18} color="#007AFF" />
-            <Text style={styles.walletText}>Métodos de pago</Text>
-            <Icon name="chevron-forward" size={16} color="#666" style={{ marginLeft: 'auto' }} />
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity
+              style={styles.walletRow}
+              onPress={() => navigation.navigate('PaymentMethods')}
+            >
+              <Icon name="card-outline" size={18} color="#007AFF" />
+              <Text style={styles.walletText}>Métodos de pago</Text>
+              <Icon name="chevron-forward" size={16} color="#666" style={{ marginLeft: 'auto' }} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.walletRow, { marginTop: 8 }]}
+              onPress={() => navigation.navigate('PaymentHistory')}
+            >
+              <Icon name="receipt-outline" size={18} color="#007AFF" />
+              <Text style={styles.walletText}>Historial de pagos</Text>
+              <Icon name="chevron-forward" size={16} color="#666" style={{ marginLeft: 'auto' }} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.walletRow, { backgroundColor: '#F0FFF4', marginTop: 8 }]}
+              onPress={() => navigation.navigate('DriverRegister')}
+            >
+              <Icon name="car-sport-outline" size={18} color="#34C759" />
+              <Text style={[styles.walletText, { color: '#34C759' }]}>Conviértete en conductor</Text>
+              <Icon name="chevron-forward" size={16} color="#666" style={{ marginLeft: 'auto' }} />
+            </TouchableOpacity>
+          </>
         )}
         {isSaving && (
           <View style={styles.savingRow}>

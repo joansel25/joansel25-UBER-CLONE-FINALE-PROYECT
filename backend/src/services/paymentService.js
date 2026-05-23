@@ -208,6 +208,22 @@ class PaymentService {
   }
 
   /**
+   * Returns all transactions for a user, newest first.
+   */
+  async getUserTransactions(userId, { page = 1, limit = 20 } = {}) {
+    const skip = (page - 1) * limit;
+    const [transactions, total] = await Promise.all([
+      Transaction.find({ passenger: userId })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('trip', 'origin destination fare vehicleCategory status'),
+      Transaction.countDocuments({ passenger: userId }),
+    ]);
+    return { transactions, total, page, pages: Math.ceil(total / limit) };
+  }
+
+  /**
    * Returns the Transaction record for a given trip.
    */
   async getTransactionByTrip(tripId) {

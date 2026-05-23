@@ -7,6 +7,7 @@ const paymentApi = {
   createIntent:  (tripId, paymentMethodId) =>
     client.post('/payments/create-intent', { tripId, paymentMethodId }),
   getByTrip:     (tripId)                  => client.get(`/payments/trip/${tripId}`),
+  list:          (params)                  => client.get('/payments', { params }),
 };
 
 export default paymentApi;

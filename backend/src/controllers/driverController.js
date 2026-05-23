@@ -29,25 +29,35 @@ class DriverController {
   }
 
   /**
-   * Registers a user as a driver.
+   * POST /api/drivers/register (protected)
+   * Registers the authenticated user as a driver.
+   * userId is resolved from the Firebase token — not accepted from the body.
    */
   async register(req, res, next) {
     try {
-      // 1. Validate incoming data
-      const validatedData = driverValidationSchema.parse(req.body);
-
-      // 2. Pass to service layer
-      const driver = await driverService.registerDriver(
-        validatedData.userId,
-        validatedData.vehicleInfo,
-        validatedData.licenseNumber
-      );
-
-      // 3. Return success response
-      res.status(201).json({
-        success: true,
-        data: driver
+      const bodySchema = z.object({
+        vehicleInfo: z.object({
+          make:  z.string().min(1),
+          model: z.string().min(1),
+          year:  z.number().int().min(1990).max(new Date().getFullYear() + 1),
+          color: z.string().min(1),
+          plate: z.string().min(1),
+        }),
+        licenseNumber: z.string().min(3),
       });
+
+      const { vehicleInfo, licenseNumber } = bodySchema.parse(req.body);
+
+      const user = await User.findOne({ firebaseUid: req.user.uid });
+      if (!user) {
+        const err = new Error('User not found. Complete registration first.');
+        err.statusCode = 404;
+        throw err;
+      }
+
+      const driver = await driverService.registerDriver(user._id, vehicleInfo, licenseNumber);
+
+      res.status(201).json({ success: true, data: driver });
     } catch (error) {
       next(error);
     }

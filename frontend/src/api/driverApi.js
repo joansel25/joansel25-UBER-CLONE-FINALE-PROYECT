@@ -1,7 +1,8 @@
 import client from './client';
 
 const driverApi = {
-  register:       (data)                       => client.post('/drivers/register', data),
+  register:       (vehicleInfo, licenseNumber) =>
+    client.post('/drivers/register', { vehicleInfo, licenseNumber }),
   getMe:          ()                           => client.get('/drivers/me'),
   getById:        (id)                         => client.get(`/drivers/${id}`),
   updateStatus:   (driverId, status)           => client.patch('/drivers/status', { driverId, status }),

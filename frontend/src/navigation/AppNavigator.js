@@ -10,6 +10,9 @@ import DriverTabNavigator       from './DriverTabNavigator';
 import RegisterScreen           from '../screens/auth/RegisterScreen';
 import FollowTravelScreen       from '../screens/FollowTravelScreen';
 import PaymentMethodsScreen     from '../screens/PaymentMethodsScreen';
+import PaymentHistory           from '../screens/PaymentHistory';
+import TripDetailScreen         from '../screens/TripDetailScreen';
+import DriverRegisterScreen     from '../screens/driver/DriverRegisterScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -33,14 +36,19 @@ export default function AppNavigator() {
           // Driver → driver-specific tabs + shared screens
           <>
             <Stack.Screen name="DriverMain"      component={DriverTabNavigator} />
+            <Stack.Screen name="TripDetail"      component={TripDetailScreen} />
             <Stack.Screen name="PaymentMethods"  component={PaymentMethodsScreen} />
+            <Stack.Screen name="PaymentHistory"  component={PaymentHistory} />
           </>
         ) : (
           // Passenger → main app
           <>
             <Stack.Screen name="Main"            component={TabNavigator} />
             <Stack.Screen name="FollowTravel"    component={FollowTravelScreen} />
+            <Stack.Screen name="TripDetail"      component={TripDetailScreen} />
             <Stack.Screen name="PaymentMethods"  component={PaymentMethodsScreen} />
+            <Stack.Screen name="PaymentHistory"  component={PaymentHistory} />
+            <Stack.Screen name="DriverRegister"  component={DriverRegisterScreen} />
           </>
         )}
       </Stack.Navigator>

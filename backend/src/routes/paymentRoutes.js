@@ -3,6 +3,9 @@ const router = express.Router();
 const paymentController = require('../controllers/paymentController');
 const { protect } = require('../middleware/auth');
 
+// GET  /api/payments                       — transaction history for the user
+router.get('/',                    protect, paymentController.listUserTransactions);
+
 // POST /api/payments/create-intent        — generate Stripe PaymentIntent
 router.post('/create-intent',      protect, paymentController.createIntent);
 
