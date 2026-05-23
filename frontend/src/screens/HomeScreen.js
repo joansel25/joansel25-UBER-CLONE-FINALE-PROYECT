@@ -7,8 +7,9 @@ import {
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import Icon from 'react-native-vector-icons/Ionicons';
 
+import { useDispatch }  from 'react-redux';
+import { setOrigin, setDestination, setActiveTrip } from '../store/slices/tripSlice';
 import { useAuth }     from '../context/AuthContext';
-import { useTrip }     from '../context/TripContext';
 import useLocation     from '../hooks/useLocation';
 import placesApi       from '../api/placesApi';
 import tripApi         from '../api/tripApi';
@@ -24,9 +25,9 @@ const DEFAULT_REGION = { latitude: 4.7110, longitude: -74.0721, latitudeDelta: 0
 const STEP = { IDLE: 'idle', SEARCHING: 'searching', ESTIMATING: 'estimating', READY: 'ready', REQUESTING: 'requesting' };
 
 export default function HomeScreen({ navigation }) {
-  const { dbUser }                                   = useAuth();
-  const { setActiveTrip, setOrigin, setDestination } = useTrip();
-  const { location }                                 = useLocation();
+  const dispatch       = useDispatch();
+  const { dbUser }     = useAuth();
+  const { location }   = useLocation();
 
   const mapRef        = useRef(null);
   const debounceTimer = useRef(null);
@@ -100,7 +101,7 @@ export default function HomeScreen({ navigation }) {
         lng:     detailsResult.data.lng,
       };
       setDestPlace(dest);
-      setDestination(dest);
+      dispatch(setDestination(dest));
 
       // Renew session token after selection (Google billing requirement)
       sessionToken.current = String(Date.now());
@@ -111,7 +112,7 @@ export default function HomeScreen({ navigation }) {
         lat: location.latitude,
         lng: location.longitude,
       };
-      setOrigin(origin);
+      dispatch(setOrigin(origin));
 
       const estimateResult = await tripApi.estimate({
         originLat: origin.lat,
@@ -161,7 +162,7 @@ export default function HomeScreen({ navigation }) {
         paymentMethod:   'card',
       });
 
-      setActiveTrip(result.data);
+      dispatch(setActiveTrip(result.data));
       navigation.navigate('FollowTravel', { tripId: result.data._id });
     } catch (error) {
       Alert.alert('Error', error.message || 'No se pudo crear el viaje. Intenta de nuevo.');

@@ -12,7 +12,8 @@ import useTripTracking  from '../hooks/useTripTracking';
 import RatingModal      from '../components/trip/RatingModal';
 import tripApi          from '../api/tripApi';
 import paymentApi       from '../api/paymentApi';
-import { useTrip }      from '../context/TripContext';
+import { useDispatch }  from 'react-redux';
+import { clearTrip }   from '../store/slices/tripSlice';
 import { COLORS, SPACING, FONT, RADIUS, SHADOW } from '../constants/theme';
 import { formatCOP }    from '../utils/formatters';
 
@@ -52,8 +53,8 @@ const BRAND_LABEL = { visa: 'Visa', mastercard: 'Mastercard', amex: 'Amex', disc
 
 export default function FollowTravelScreen({ route, navigation }) {
   const { tripId } = route.params;
-  const { clearTrip } = useTrip();
-  const mapRef = useRef(null);
+  const dispatch   = useDispatch();
+  const mapRef     = useRef(null);
   const { initPaymentSheet, presentPaymentSheet, confirmPayment } = useStripe();
 
   const [rating,        setRating]        = useState(false);
@@ -112,7 +113,7 @@ export default function FollowTravelScreen({ route, navigation }) {
             setCancelling(true);
             try { await tripApi.cancel(tripId); } catch { /* already cancelled */ }
             setCancelling(false);
-            clearTrip();
+            dispatch(clearTrip());
             navigation.goBack();
           },
         },
@@ -182,7 +183,7 @@ export default function FollowTravelScreen({ route, navigation }) {
       await tripApi.rate(tripId, stars);
     } catch { /* ignore */ }
     setRatingLoading(false);
-    clearTrip();
+    dispatch(clearTrip());
     navigation.goBack();
   };
 
@@ -395,7 +396,7 @@ export default function FollowTravelScreen({ route, navigation }) {
           {status === 'cancelled' && (
             <TouchableOpacity
               style={[styles.primaryBtn, { backgroundColor: COLORS.danger }]}
-              onPress={() => { clearTrip(); navigation.goBack(); }}
+              onPress={() => { dispatch(clearTrip()); navigation.goBack(); }}
             >
               <Text style={styles.primaryBtnText}>Volver al inicio</Text>
             </TouchableOpacity>
