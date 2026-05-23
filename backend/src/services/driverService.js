@@ -83,6 +83,20 @@ class DriverService {
   }
 
   /**
+   * Finds a driver profile by their MongoDB User ID.
+   */
+  async getDriverByUserId(userId) {
+    const driver = await Driver.findOne({ user: userId })
+      .populate('user', 'fullName email phone profilePic rating');
+    if (!driver) {
+      const err = new Error('Driver profile not found');
+      err.statusCode = 404;
+      throw err;
+    }
+    return driver;
+  }
+
+  /**
    * Updates the geospatial location of a driver.
    */
   async updateLocation(driverId, longitude, latitude) {

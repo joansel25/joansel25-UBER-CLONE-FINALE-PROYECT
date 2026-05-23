@@ -148,6 +148,24 @@ class TripController {
   }
 
   /**
+   * GET /api/trips/available
+   * Returns all open (requested) trips for drivers to browse.
+   */
+  async getAvailable(req, res, next) {
+    try {
+      const pageSchema = z.object({
+        page:  z.coerce.number().int().positive().optional(),
+        limit: z.coerce.number().int().positive().max(20).optional(),
+      });
+      const { page, limit } = pageSchema.parse(req.query);
+      const result = await tripService.getAvailableTrips({ page, limit });
+      res.status(200).json({ success: true, ...result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * GET /api/trips
    * Returns paginated trip history for the authenticated user.
    */

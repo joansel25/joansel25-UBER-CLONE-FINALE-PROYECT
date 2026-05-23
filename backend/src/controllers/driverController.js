@@ -1,6 +1,7 @@
 const driverService = require('../services/driverService');
 const geoService = require('../services/geoService');
 const trackingService = require('../services/trackingService');
+const { User } = require('../models/User');
 const { driverValidationSchema } = require('../models/Driver');
 const { z } = require('zod');
 
@@ -8,6 +9,25 @@ const { z } = require('zod');
  * Handles HTTP interface for driver operations.
  */
 class DriverController {
+  /**
+   * GET /api/drivers/me
+   * Returns the Driver profile for the currently authenticated user.
+   */
+  async getMe(req, res, next) {
+    try {
+      const user = await User.findOne({ firebaseUid: req.user.uid });
+      if (!user) {
+        const err = new Error('User not found');
+        err.statusCode = 404;
+        throw err;
+      }
+      const driver = await driverService.getDriverByUserId(user._id);
+      res.status(200).json({ success: true, data: driver });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   /**
    * Registers a user as a driver.
    */

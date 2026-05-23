@@ -6,6 +6,7 @@ import { useAuth }           from '../context/AuthContext';
 import Loader                from '../components/common/Loader';
 import AuthNavigator         from './AuthNavigator';
 import TabNavigator          from './TabNavigator';
+import DriverTabNavigator    from './DriverTabNavigator';
 import RegisterScreen        from '../screens/auth/RegisterScreen';
 import FollowTravelScreen    from '../screens/FollowTravelScreen';
 
@@ -16,6 +17,8 @@ export default function AppNavigator() {
 
   if (loading) return <Loader fullscreen />;
 
+  const isDriver = dbUser?.role === 'driver';
+
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -25,10 +28,13 @@ export default function AppNavigator() {
         ) : !dbUser ? (
           // Firebase account exists but MongoDB profile not created yet
           <Stack.Screen name="Register" component={RegisterScreen} />
+        ) : isDriver ? (
+          // Driver → driver-specific tab navigator
+          <Stack.Screen name="DriverMain" component={DriverTabNavigator} />
         ) : (
-          // Fully authenticated → Main app
+          // Passenger → main app
           <>
-            <Stack.Screen name="Main"        component={TabNavigator} />
+            <Stack.Screen name="Main"         component={TabNavigator} />
             <Stack.Screen name="FollowTravel" component={FollowTravelScreen} />
           </>
         )}

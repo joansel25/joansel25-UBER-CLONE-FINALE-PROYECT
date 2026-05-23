@@ -219,6 +219,25 @@ class TripService {
   }
 
   /**
+   * Returns all trips with status 'requested', newest first, paginated.
+   * Used by drivers to see open requests.
+   */
+  async getAvailableTrips({ page = 1, limit = 10 } = {}) {
+    const skip = (page - 1) * limit;
+
+    const [trips, total] = await Promise.all([
+      Trip.find({ status: 'requested' })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('passenger', 'fullName phone profilePic rating'),
+      Trip.countDocuments({ status: 'requested' }),
+    ]);
+
+    return { trips, total, page, pages: Math.ceil(total / limit) };
+  }
+
+  /**
    * Cancels a trip. Allowed while status is 'requested' or 'accepted'.
    */
   async cancelTrip(tripId, userId) {

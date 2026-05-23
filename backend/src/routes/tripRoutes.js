@@ -10,10 +10,11 @@ const { protect } = require('../middleware/auth');
 router.use(protect);
 
 // Basic CRUD
-router.post('/',          tripController.create);
-router.get('/',           tripController.getHistory);
-router.get('/estimate',   tripController.estimate);   // must be before /:id
-router.get('/:id',        tripController.getById);
+router.post('/',            tripController.create);
+router.get('/',             tripController.getHistory);
+router.get('/estimate',     tripController.estimate);    // must be before /:id
+router.get('/available',    tripController.getAvailable); // must be before /:id
+router.get('/:id',          tripController.getById);
 
 // Lifecycle transitions
 router.patch('/:id/accept',   tripController.accept);
