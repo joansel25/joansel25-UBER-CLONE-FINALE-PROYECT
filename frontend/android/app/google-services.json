@@ -1,21 +1,22 @@
 {
   "project_info": {
-    "project_number": "416098896114",
-    "project_id": "uberdatabase-f6b26",
-    "storage_bucket": "uberdatabase-f6b26.firebasestorage.app"
+    "project_number": "415284742488",
+    "firebase_url": "https://uberclone-74485-default-rtdb.firebaseio.com",
+    "project_id": "uberclone-74485",
+    "storage_bucket": "uberclone-74485.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:416098896114:android:f7b45deec600d035b7e86b",
+        "mobilesdk_app_id": "1:415284742488:android:d465cdfa20f5581fe57d2d",
         "android_client_info": {
-          "package_name": "com.finaleproyectuber"
+          "package_name": "com.company.Uberjoan"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyB1ASr2qFFADCugpo_0brWXHB5HWI3sSMU"
+          "current_key": "AIzaSyAkd1KapYCcr9LjK4J1mGtGp6RzDLfQrq8"
         }
       ],
       "services": {

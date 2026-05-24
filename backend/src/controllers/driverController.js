@@ -64,46 +64,55 @@ class DriverController {
   }
 
   /**
-   * Updates the availability status of the driver.
+   * PATCH /api/drivers/status (protected)
+   * Updates the availability status of the authenticated driver.
    */
   async updateStatus(req, res, next) {
     try {
-      //  validation schema for status update
       const statusSchema = z.object({
-        driverId: z.string(),
-        status: z.enum(['available', 'busy', 'offline'])
+        status: z.enum(['available', 'busy', 'offline']),
       });
+      const { status } = statusSchema.parse(req.body);
 
-      const { driverId, status } = statusSchema.parse(req.body);
+      const user   = await User.findOne({ firebaseUid: req.user.uid });
+      if (!user) {
+        const err = new Error('User not found');
+        err.statusCode = 404;
+        throw err;
+      }
+      const driver = await driverService.getDriverByUserId(user._id);
 
-      const updatedDriver = await driverService.updateStatus(driverId, status);
-
-      res.status(200).json({
-        success: true,
-        data: updatedDriver
-      });
+      const updatedDriver = await driverService.updateStatus(driver._id, status);
+      res.status(200).json({ success: true, data: updatedDriver });
     } catch (error) {
       next(error);
     }
   }
 
   /**
-   * Updates the current location of the driver.
+   * PATCH /api/drivers/location (protected)
+   * Updates the current GPS location of the authenticated driver.
    */
   async updateLocation(req, res, next) {
     try {
       const locationSchema = z.object({
-        driverId:  z.string(),
         longitude: z.number().min(-180).max(180),
         latitude:  z.number().min(-90).max(90),
         tripId:    z.string().optional(),
       });
+      const { longitude, latitude, tripId } = locationSchema.parse(req.body);
 
-      const { driverId, longitude, latitude, tripId } = locationSchema.parse(req.body);
+      const user = await User.findOne({ firebaseUid: req.user.uid });
+      if (!user) {
+        const err = new Error('User not found');
+        err.statusCode = 404;
+        throw err;
+      }
+      const driver = await driverService.getDriverByUserId(user._id);
 
       const [updatedDriver] = await Promise.all([
-        driverService.updateLocation(driverId, longitude, latitude),
-        trackingService.updateDriverLocation(driverId, latitude, longitude, tripId),
+        driverService.updateLocation(driver._id, longitude, latitude),
+        trackingService.updateDriverLocation(driver._id.toString(), latitude, longitude, tripId),
       ]);
 
       res.status(200).json({ success: true, data: updatedDriver });

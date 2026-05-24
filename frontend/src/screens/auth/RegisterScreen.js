@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { SafeAreaView }  from 'react-native-safe-area-context';
 import Icon              from 'react-native-vector-icons/Ionicons';
-import auth              from '@react-native-firebase/auth';
+import { getAuth, createUserWithEmailAndPassword } from '@react-native-firebase/auth';
 import { useAuth }       from '../../context/AuthContext';
 import userApi           from '../../api/userApi';
 import ErrorBanner       from '../../components/common/ErrorBanner';
@@ -26,7 +26,7 @@ const LANGUAGE_OPTIONS = [
 const EMPTY_ERRORS = { fullName: '', email: '', phone: '', gender: '', password: '', confirm: '' };
 
 export default function RegisterScreen({ navigation }) {
-  const { refreshUser } = useAuth();
+  const { refreshUser, signOut, firebaseUser } = useAuth();
 
   const [form, setForm] = useState({
     fullName: '', email: '', phone: '',
@@ -81,7 +81,8 @@ export default function RegisterScreen({ navigation }) {
 
     try {
       // 1. Create Firebase Auth account
-      const credential = await auth().createUserWithEmailAndPassword(
+      const credential = await createUserWithEmailAndPassword(
+        getAuth(),
         form.email.trim().toLowerCase(),
         form.password,
       );
@@ -102,9 +103,13 @@ export default function RegisterScreen({ navigation }) {
       await refreshUser();
 
     } catch (err) {
-      // Rollback: delete Firebase account if backend registration failed
-      const fbUser = auth().currentUser;
-      if (fbUser && err.statusCode) {
+      console.log('[Register Error] code:', err.code, '| message:', err.message);
+      // Rollback: if Firebase created the account but the backend failed,
+      // delete the Firebase account to avoid orphaned accounts.
+      // Firebase errors have err.code starting with 'auth/'; backend/network
+      // errors don't — those are the cases where we need to rollback.
+      const fbUser = getAuth().currentUser;
+      if (fbUser && !err.code?.startsWith('auth/')) {
         await fbUser.delete().catch(() => null);
       }
       setGlobalError(friendlyMessage(err.code, err.message));
@@ -289,7 +294,7 @@ export default function RegisterScreen({ navigation }) {
             {navigation && (
               <TouchableOpacity
                 style={styles.loginLink}
-                onPress={() => navigation.navigate('Login')}
+                onPress={() => firebaseUser ? signOut() : navigation.navigate('Login')}
                 disabled={loading}
               >
                 <Text style={styles.loginLinkText}>

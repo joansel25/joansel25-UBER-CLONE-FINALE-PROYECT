@@ -1,5 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import auth from '@react-native-firebase/auth';
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut as firebaseSignOut,
+} from '@react-native-firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import userApi from '../api/userApi';
 
@@ -14,21 +19,39 @@ export function AuthProvider({ children }) {
 
   // Listen for Firebase auth state changes
   useEffect(() => {
-    const unsubscribe = auth().onAuthStateChanged(async (fbUser) => {
+    const unsubscribe = onAuthStateChanged(getAuth(), async (fbUser) => {
       setFirebaseUser(fbUser);
 
       if (fbUser) {
         try {
-          // Try cached profile first for instant load
+          // Serve cached profile instantly while we fetch fresh data
           const cached = await AsyncStorage.getItem(USER_KEY);
           if (cached) setDbUser(JSON.parse(cached));
 
-          // Always refresh from backend
-          const { data } = await userApi.getMe();
-          setDbUser(data);
-          await AsyncStorage.setItem(USER_KEY, JSON.stringify(data));
+          // Fetch profile — retry once to handle the race condition where
+          // onAuthStateChanged fires before the MongoDB profile is created
+          let data = null;
+          try {
+            ({ data } = await userApi.getMe());
+          } catch (firstErr) {
+            console.log('[AuthContext] getMe attempt 1 failed:', firstErr.statusCode, firstErr.message);
+            // Wait 2 s and retry (covers registration race condition)
+            await new Promise(r => setTimeout(r, 2000));
+            try {
+              ({ data } = await userApi.getMe());
+            } catch (secondErr) {
+              console.log('[AuthContext] getMe attempt 2 failed:', secondErr.statusCode, secondErr.message);
+            }
+          }
+
+          if (data) {
+            setDbUser(data);
+            await AsyncStorage.setItem(USER_KEY, JSON.stringify(data));
+          } else {
+            setDbUser(null);
+            await AsyncStorage.removeItem(USER_KEY);
+          }
         } catch {
-          // If backend call fails (e.g. user not registered yet), keep null
           setDbUser(null);
         }
       } else {
@@ -43,10 +66,10 @@ export function AuthProvider({ children }) {
   }, []);
 
   const signIn = (email, password) =>
-    auth().signInWithEmailAndPassword(email, password);
+    signInWithEmailAndPassword(getAuth(), email, password);
 
   const signOut = async () => {
-    await auth().signOut();
+    await firebaseSignOut(getAuth());
     await AsyncStorage.removeItem(USER_KEY);
     setDbUser(null);
   };

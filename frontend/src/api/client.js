@@ -1,6 +1,6 @@
 import axios from 'axios';
 import Config from 'react-native-config';
-import auth from '@react-native-firebase/auth';
+import { getAuth } from '@react-native-firebase/auth';
 
 // Base URL comes from .env  →  API_URL=http://10.0.2.2:5000/api  (Android emulator)
 //                             API_URL=http://localhost:5000/api   (iOS simulator)
@@ -12,7 +12,7 @@ const client = axios.create({
 
 // Attach the Firebase ID token automatically on every request
 client.interceptors.request.use(async (config) => {
-  const user = auth().currentUser;
+  const user = getAuth().currentUser;
   if (user) {
     const token = await user.getIdToken();
     config.headers.Authorization = `Bearer ${token}`;

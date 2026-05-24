@@ -1,8 +1,9 @@
 const { z } = require('zod');
 const { User } = require('../models/User');
-const tripService = require('../services/tripService');
-const mapsService = require('../services/mapsService');
-const geoService  = require('../services/geoService');
+const tripService     = require('../services/tripService');
+const mapsService     = require('../services/mapsService');
+const geoService      = require('../services/geoService');
+const trackingService = require('../services/trackingService');
 
 // ── Zod schemas ────────────────────────────────────────────────────────────
 
@@ -19,9 +20,6 @@ const createTripSchema = z.object({
   paymentMethod:   z.enum(['card', 'cash']).optional(),
 });
 
-const acceptSchema = z.object({
-  driverId: z.string().min(1),
-});
 
 // ── Helper ─────────────────────────────────────────────────────────────────
 
@@ -202,11 +200,12 @@ class TripController {
   /**
    * PATCH /api/trips/:id/accept
    * Driver accepts a requested trip.
+   * driverId is resolved from the Firebase token — not accepted from the body.
    */
   async accept(req, res, next) {
     try {
-      const { driverId } = acceptSchema.parse(req.body);
-      const trip = await tripService.acceptTrip(req.params.id, driverId);
+      const user = await resolveUser(req.user.uid);
+      const trip = await tripService.acceptTrip(req.params.id, user._id);
       res.status(200).json({ success: true, data: trip });
     } catch (error) {
       next(error);
@@ -221,6 +220,7 @@ class TripController {
     try {
       const user = await resolveUser(req.user.uid);
       const trip = await tripService.startTrip(req.params.id, user._id);
+      trackingService.startTripTracking(req.params.id, user._id.toString()).catch(() => {});
       res.status(200).json({ success: true, data: trip });
     } catch (error) {
       next(error);
@@ -235,6 +235,7 @@ class TripController {
     try {
       const user = await resolveUser(req.user.uid);
       const trip = await tripService.completeTrip(req.params.id, user._id);
+      trackingService.endTripTracking(req.params.id).catch(() => {});
       res.status(200).json({ success: true, data: trip });
     } catch (error) {
       next(error);
@@ -249,6 +250,9 @@ class TripController {
     try {
       const user = await resolveUser(req.user.uid);
       const trip = await tripService.cancelTrip(req.params.id, user._id);
+      if (trip.driver) {
+        trackingService.endTripTracking(req.params.id).catch(() => {});
+      }
       res.status(200).json({ success: true, data: trip });
     } catch (error) {
       next(error);

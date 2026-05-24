@@ -66,11 +66,10 @@ export default function DriverHomeScreen() {
 
   // ── Location broadcasting ───────────────────────────────────────────────
 
-  const broadcastLocation = useCallback((driverId, tripId = null) => {
+  const broadcastLocation = useCallback((tripId = null) => {
     Geolocation.getCurrentPosition(
       pos => {
         driverApi.updateLocation(
-          driverId,
           pos.coords.latitude,
           pos.coords.longitude,
           tripId,
@@ -81,11 +80,11 @@ export default function DriverHomeScreen() {
     );
   }, []);
 
-  const startLocationBroadcast = useCallback((driverId, tripId = null) => {
+  const startLocationBroadcast = useCallback((tripId = null) => {
     stopLocationBroadcast();
-    broadcastLocation(driverId, tripId);
+    broadcastLocation(tripId);
     locationWatchRef.current = setInterval(
-      () => broadcastLocation(driverId, tripId),
+      () => broadcastLocation(tripId),
       LOCATION_INTERVAL,
     );
   }, [broadcastLocation]);
@@ -130,11 +129,11 @@ export default function DriverHomeScreen() {
     setStatusChanging(true);
     setError('');
     try {
-      await driverApi.updateStatus(driverDoc._id, newStatus);
+      await driverApi.updateStatus(newStatus);
       setDriverStatus(newStatus);
 
       if (newStatus === 'available') {
-        startLocationBroadcast(driverDoc._id);
+        startLocationBroadcast();
         startTripsPoll();
       } else {
         stopLocationBroadcast();
@@ -154,14 +153,14 @@ export default function DriverHomeScreen() {
     setAcceptingId(trip._id);
     setError('');
     try {
-      const res = await tripApi.accept(trip._id, dbUser._id);
+      const res = await tripApi.accept(trip._id);
       const accepted = res.data;
       setActiveTrip(accepted);
       setTripPhase('accepted');
       stopTripsPoll();
 
       // Switch to broadcasting with tripId
-      if (driverDoc) startLocationBroadcast(driverDoc._id, trip._id);
+      startLocationBroadcast(trip._id);
 
       // Poll active trip status
       tripPollRef.current = setInterval(async () => {
@@ -231,7 +230,7 @@ export default function DriverHomeScreen() {
     setActiveTrip(null);
     setTripPhase('idle');
     setDriverStatus('offline');
-    if (driverDoc) driverApi.updateStatus(driverDoc._id, 'offline').catch(() => {});
+    driverApi.updateStatus('offline').catch(() => {});
   };
 
   // ── Cleanup on unmount ──────────────────────────────────────────────────
