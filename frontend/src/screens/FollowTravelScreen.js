@@ -142,29 +142,32 @@ export default function FollowTravelScreen({ route, navigation }) {
       } catch (e) {
         console.error('[Sim] accept failed:', e.message);
       }
-    }, 3000);
+    }, 2000);
 
     return () => clearTimeout(timer);
   }, [trip?.status, tripId]);
 
-  // ── SIMULATION STEP 2: Auto-start after 5s in 'accepted' state ────────────
+  // ── SIMULATION STEP 2: Driver approaches pickup (accepted → ongoing) ─────────
+  // dep array only uses primitives — object refs (trip.origin) are captured in
+  // the closure at effect-run time to avoid interval being cancelled by re-renders
   useEffect(() => {
     if (!trip || trip.status !== 'accepted' || simStartedRef.current) return;
     simStartedRef.current = true;
 
-    // Move driver toward origin over 5s (5 steps)
-    const origin = trip.origin;
-    const driverLat = (origin?.lat ?? 4.711) + 0.0022;
-    const driverLng = (origin?.lng ?? -74.072) + 0.0012;
-    const steps = 5;
+    // Capture primitive coords so the closure is stable
+    const originLat = trip.origin?.lat  ?? 4.711;
+    const originLng = trip.origin?.lng  ?? -74.072;
+    const driverLat = originLat + 0.0022;
+    const driverLng = originLng + 0.0012;
+    const steps = 4;
     let step = 0;
 
     const approachInterval = setInterval(() => {
       step++;
       const fraction = step / steps;
       database().ref(`/drivers/${SIM_DRIVER_ID}/location`).set({
-        lat: driverLat + (((origin?.lat ?? 4.711) - driverLat) * fraction),
-        lng: driverLng + (((origin?.lng ?? -74.072) - driverLng) * fraction),
+        lat: driverLat + ((originLat - driverLat) * fraction),
+        lng: driverLng + ((originLng - driverLng) * fraction),
         timestamp: Date.now(),
       }).catch(() => {});
 
@@ -172,18 +175,26 @@ export default function FollowTravelScreen({ route, navigation }) {
         clearInterval(approachInterval);
         tripApi.start(tripId).catch(e => console.error('[Sim] start failed:', e.message));
       }
-    }, 1000);
+    }, 600);
 
     return () => clearInterval(approachInterval);
-  }, [trip?.status, tripId, trip?.origin]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trip?.status, tripId]);
 
-  // ── SIMULATION STEP 3: Animate driver along route during 'ongoing' ─────────
+  // ── SIMULATION STEP 3: Driver travels along route (ongoing → completed) ──────
+  // Capture polyline & destination as primitives/values in the closure.
+  // Object deps are excluded to prevent interval cancellation on re-renders.
   useEffect(() => {
     if (!trip || trip.status !== 'ongoing' || !trip.polyline) return;
     if (simOngoingRef.current || simIntervalRef.current) return;
     simOngoingRef.current = true;
 
-    const coords = samplePolyline(trip.polyline, 40);
+    // Capture stable values now (Firestore re-snapshots create new object refs)
+    const polyline = trip.polyline;
+    const destLat  = trip.destination?.lat;
+    const destLng  = trip.destination?.lng;
+
+    const coords = samplePolyline(polyline, 25);
     if (coords.length === 0) {
       tripApi.complete(tripId).catch(() => {});
       return;
@@ -195,11 +206,9 @@ export default function FollowTravelScreen({ route, navigation }) {
       if (step >= coords.length) {
         clearInterval(simIntervalRef.current);
         simIntervalRef.current = null;
-        // Place driver exactly at destination
-        const dest = trip.destination;
-        if (dest?.lat) {
+        if (destLat != null) {
           await database().ref(`/drivers/${SIM_DRIVER_ID}/location`).set({
-            lat: dest.lat, lng: dest.lng, timestamp: Date.now(),
+            lat: destLat, lng: destLng, timestamp: Date.now(),
           }).catch(() => {});
         }
         await tripApi.complete(tripId).catch(() => {});
@@ -209,7 +218,7 @@ export default function FollowTravelScreen({ route, navigation }) {
       database().ref(`/drivers/${SIM_DRIVER_ID}/location`).set({
         lat: latitude, lng: longitude, timestamp: Date.now(),
       }).catch(() => {});
-    }, 900);
+    }, 600);
 
     return () => {
       if (simIntervalRef.current) {
@@ -217,7 +226,8 @@ export default function FollowTravelScreen({ route, navigation }) {
         simIntervalRef.current = null;
       }
     };
-  }, [trip?.status, tripId, trip?.polyline, trip?.destination]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trip?.status, tripId]);
 
   // ── Fit map to show origin + driver ────────────────────────────────────────
   const handleMapReady = useCallback(() => {
