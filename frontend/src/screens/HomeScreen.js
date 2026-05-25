@@ -280,13 +280,28 @@ export default function HomeScreen({ navigation }) {
       <TouchableOpacity
         style={styles.myLocationBtn}
         onPress={() => {
-          if (location) {
-            mapRef.current?.animateToRegion({
-              latitude:      location.latitude,
-              longitude:     location.longitude,
-              latitudeDelta:  0.01,
-              longitudeDelta: 0.01,
-            }, 400);
+          if (!location) return;
+          const gpsPlace = {
+            address: 'Mi ubicación actual',
+            lat:     location.latitude,
+            lng:     location.longitude,
+          };
+          // Update origin input and place
+          setOriginPlace(gpsPlace);
+          setOriginText('Mi ubicación actual');
+          setActiveField(null);
+          setSuggestions([]);
+          dispatch(setOrigin(gpsPlace));
+          // Animate map to current location
+          mapRef.current?.animateToRegion({
+            latitude:      location.latitude,
+            longitude:     location.longitude,
+            latitudeDelta:  0.01,
+            longitudeDelta: 0.01,
+          }, 400);
+          // If destination already set, recalculate estimate
+          if (destPlace && step !== STEP.REQUESTING) {
+            calculateEstimate(gpsPlace, destPlace);
           }
         }}
       >
