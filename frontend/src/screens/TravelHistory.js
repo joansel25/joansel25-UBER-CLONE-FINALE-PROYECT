@@ -9,17 +9,18 @@ import Icon from 'react-native-vector-icons/Ionicons';
 
 import tripApi    from '../api/tripApi';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from '../hooks/useTranslation';
 import { COLORS, SPACING, FONT, RADIUS, SHADOW } from '../constants/theme';
 import { formatCOP, formatDate } from '../utils/formatters';
 
-// ── Status config ───────────────────────────────────────────────────────────
+// ── Status config (labels resolved via t() at render time) ─────────────────
 
 const STATUS = {
-  requested: { label: 'Solicitado',  color: '#FF9500', bg: '#FFF3E0' },
-  accepted:  { label: 'Aceptado',    color: '#007AFF', bg: '#E3F2FD' },
-  ongoing:   { label: 'En curso',    color: '#5856D6', bg: '#EEF2FF' },
-  completed: { label: 'Completado',  color: '#34C759', bg: '#F0FFF4' },
-  cancelled: { label: 'Cancelado',   color: '#FF3B30', bg: '#FFF0F0' },
+  requested: { color: '#FF9500', bg: '#FFF3E0' },
+  accepted:  { color: '#007AFF', bg: '#E3F2FD' },
+  ongoing:   { color: '#5856D6', bg: '#EEF2FF' },
+  completed: { color: '#34C759', bg: '#F0FFF4' },
+  cancelled: { color: '#FF3B30', bg: '#FFF0F0' },
 };
 
 const VEHICLE_LABEL = { economy: 'Economy', xl: 'XL', premium: 'Premium' };
@@ -28,6 +29,7 @@ const VEHICLE_LABEL = { economy: 'Economy', xl: 'XL', premium: 'Premium' };
 
 export default function TravelHistory({ navigation }) {
   const { dbUser } = useAuth();
+  const { t } = useTranslation();
 
   const [trips,      setTrips]      = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -46,7 +48,7 @@ export default function TravelHistory({ navigation }) {
       setPage(pageNum);
       setError('');
     } catch {
-      setError('No se pudo cargar el historial. Intenta de nuevo.');
+      setError(t('history_error'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -88,7 +90,7 @@ export default function TravelHistory({ navigation }) {
         {/* Header row */}
         <View style={styles.cardHeader}>
           <View style={[styles.badge, { backgroundColor: st.bg }]}>
-            <Text style={[styles.badgeText, { color: st.color }]}>{st.label}</Text>
+            <Text style={[styles.badgeText, { color: st.color }]}>{t('status_' + item.status)}</Text>
           </View>
           <Text style={styles.cardFare}>{formatCOP(item.fare)}</Text>
         </View>
@@ -143,7 +145,7 @@ export default function TravelHistory({ navigation }) {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Mis viajes</Text>
+        <Text style={styles.title}>{t('history_title')}</Text>
       </View>
 
       {error ? (
@@ -151,7 +153,7 @@ export default function TravelHistory({ navigation }) {
           <Icon name="alert-circle-outline" size={40} color={COLORS.danger} />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={handleRefresh}>
-            <Text style={styles.retryText}>Reintentar</Text>
+            <Text style={styles.retryText}>{t('history_retry')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -179,10 +181,8 @@ export default function TravelHistory({ navigation }) {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Icon name="car-outline" size={56} color={COLORS.border} />
-              <Text style={styles.emptyTitle}>Sin viajes aún</Text>
-              <Text style={styles.emptySubtitle}>
-                Tus viajes aparecerán aquí una vez que los realices.
-              </Text>
+              <Text style={styles.emptyTitle}>{t('history_empty')}</Text>
+              <Text style={styles.emptySubtitle}>{t('history_empty_sub')}</Text>
             </View>
           }
         />

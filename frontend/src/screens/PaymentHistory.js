@@ -8,17 +8,19 @@ import { useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 
 import paymentApi from '../api/paymentApi';
+import { useTranslation } from '../hooks/useTranslation';
 import { COLORS, SPACING, FONT, RADIUS, SHADOW } from '../constants/theme';
 import { formatCOP, formatDate, formatTime } from '../utils/formatters';
 
 const TX_STATUS = {
-  pending:   { label: 'Pendiente',    color: '#FF9500', bg: '#FFF3E0', icon: 'time-outline' },
-  completed: { label: 'Pagado',       color: '#34C759', bg: '#F0FFF4', icon: 'checkmark-circle-outline' },
-  failed:    { label: 'Fallido',      color: '#FF3B30', bg: '#FFF0F0', icon: 'close-circle-outline' },
-  refunded:  { label: 'Reembolsado',  color: '#5856D6', bg: '#EEF2FF', icon: 'return-down-back-outline' },
+  pending:   { color: '#FF9500', bg: '#FFF3E0', icon: 'time-outline' },
+  completed: { color: '#34C759', bg: '#F0FFF4', icon: 'checkmark-circle-outline' },
+  failed:    { color: '#FF3B30', bg: '#FFF0F0', icon: 'close-circle-outline' },
+  refunded:  { color: '#5856D6', bg: '#EEF2FF', icon: 'return-down-back-outline' },
 };
 
 export default function PaymentHistory({ navigation }) {
+  const { t } = useTranslation();
   const [transactions, setTransactions] = useState([]);
   const [loading,      setLoading]      = useState(true);
   const [refreshing,   setRefreshing]   = useState(false);
@@ -36,7 +38,7 @@ export default function PaymentHistory({ navigation }) {
       setPage(pageNum);
       setError('');
     } catch {
-      setError('No se pudo cargar el historial de pagos.');
+      setError(t('pay_hist_error'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -75,13 +77,13 @@ export default function PaymentHistory({ navigation }) {
           <Text style={styles.cardRoute} numberOfLines={1}>
             {item.trip?.origin?.address
               ? `${item.trip.origin.address} → ${item.trip.destination?.address ?? ''}`
-              : 'Viaje'}
+              : t('pay_hist_trip')}
           </Text>
           <Text style={styles.cardDate}>{formatDate(item.createdAt)}  {formatTime(item.createdAt)}</Text>
         </View>
 
         <View style={[styles.badge, { backgroundColor: st.bg }]}>
-          <Text style={[styles.badgeText, { color: st.color }]}>{st.label}</Text>
+          <Text style={[styles.badgeText, { color: st.color }]}>{t('tx_' + item.status)}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -101,7 +103,7 @@ export default function PaymentHistory({ navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Icon name="arrow-back" size={22} color={COLORS.dark} />
         </TouchableOpacity>
-        <Text style={styles.title}>Historial de pagos</Text>
+        <Text style={styles.title}>{t('pay_hist_title')}</Text>
         <View style={{ width: 36 }} />
       </View>
 
@@ -110,7 +112,7 @@ export default function PaymentHistory({ navigation }) {
           <Icon name="alert-circle-outline" size={40} color={COLORS.danger} />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={handleRefresh}>
-            <Text style={styles.retryText}>Reintentar</Text>
+            <Text style={styles.retryText}>{t('history_retry')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -133,10 +135,8 @@ export default function PaymentHistory({ navigation }) {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Icon name="card-outline" size={56} color={COLORS.border} />
-              <Text style={styles.emptyTitle}>Sin pagos registrados</Text>
-              <Text style={styles.emptySubtitle}>
-                Aquí verás el historial de tus pagos con tarjeta.
-              </Text>
+              <Text style={styles.emptyTitle}>{t('pay_hist_empty')}</Text>
+              <Text style={styles.emptySubtitle}>{t('pay_hist_empty_sub')}</Text>
             </View>
           }
         />

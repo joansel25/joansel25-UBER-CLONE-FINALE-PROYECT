@@ -17,6 +17,7 @@ import paymentApi       from '../api/paymentApi';
 import decodePolyline   from '../utils/decodePolyline';
 import { useDispatch }  from 'react-redux';
 import { clearTrip }   from '../store/slices/tripSlice';
+import { useTranslation } from '../hooks/useTranslation';
 import { COLORS, SPACING, FONT, RADIUS, SHADOW } from '../constants/theme';
 import { formatCOP }    from '../utils/formatters';
 
@@ -32,15 +33,15 @@ const SIM_DRIVER = {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function statusLabel(status) {
-  switch (status) {
-    case 'requested': return 'Buscando conductor…';
-    case 'accepted':  return 'Tu conductor está en camino';
-    case 'ongoing':   return 'Viaje en curso';
-    case 'completed': return '¡Llegaste a tu destino!';
-    case 'cancelled': return 'Viaje cancelado';
-    default:          return '';
-  }
+function statusLabel(status, t) {
+  const map = {
+    requested: 'follow_searching',
+    accepted:  'follow_driver_coming',
+    ongoing:   'follow_ongoing',
+    completed: 'follow_arrived',
+    cancelled: 'follow_cancelled',
+  };
+  return map[status] ? t(map[status]) : '';
 }
 
 function statusIcon(status) {
@@ -79,6 +80,7 @@ function samplePolyline(encoded, targetSteps = 35) {
 export default function FollowTravelScreen({ route, navigation }) {
   const { tripId } = route.params;
   const dispatch   = useDispatch();
+  const { t } = useTranslation();
   const mapRef     = useRef(null);
   const { initPaymentSheet, presentPaymentSheet, confirmPayment } = useStripe();
 
@@ -288,12 +290,12 @@ export default function FollowTravelScreen({ route, navigation }) {
 
   const handleCancel = () => {
     Alert.alert(
-      'Cancelar viaje',
-      '¿Estás seguro de que quieres cancelar este viaje?',
+      t('follow_cancel_title'),
+      t('follow_cancel_msg'),
       [
-        { text: 'No', style: 'cancel' },
+        { text: t('follow_cancel_no'), style: 'cancel' },
         {
-          text: 'Sí, cancelar',
+          text: t('follow_cancel_yes'),
           style: 'destructive',
           onPress: async () => {
             setCancelling(true);
@@ -323,7 +325,7 @@ export default function FollowTravelScreen({ route, navigation }) {
       setPayDone(true);
       setRating(true);
     } catch (err) {
-      setPayError(err.message ?? 'No se pudo procesar el pago. Intenta de nuevo.');
+      setPayError(err.message ?? t('follow_pay_error1'));
     } finally {
       setPaying(false);
     }
@@ -345,13 +347,13 @@ export default function FollowTravelScreen({ route, navigation }) {
 
       const { error: presentErr } = await presentPaymentSheet();
       if (presentErr) {
-        if (presentErr.code !== 'Canceled') setPayError('No se completó el pago. Intenta de nuevo.');
+        if (presentErr.code !== 'Canceled') setPayError(t('follow_pay_error2'));
         return;
       }
       setPayDone(true);
       setRating(true);
     } catch (err) {
-      setPayError(err.message ?? 'Error al procesar el pago.');
+      setPayError(err.message ?? t('follow_pay_error3'));
     } finally {
       setPaying(false);
     }
@@ -371,7 +373,7 @@ export default function FollowTravelScreen({ route, navigation }) {
     return (
       <SafeAreaView style={styles.center}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Cargando tu viaje…</Text>
+        <Text style={styles.loadingText}>{t('follow_loading')}</Text>
       </SafeAreaView>
     );
   }
@@ -380,9 +382,9 @@ export default function FollowTravelScreen({ route, navigation }) {
     return (
       <SafeAreaView style={styles.center}>
         <Icon name="alert-circle-outline" size={48} color={COLORS.danger} />
-        <Text style={styles.errorText}>{error ?? 'No se pudo cargar el viaje.'}</Text>
+        <Text style={styles.errorText}>{error ?? t('follow_load_error')}</Text>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backBtnText}>Volver</Text>
+          <Text style={styles.backBtnText}>{t('follow_back')}</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -474,14 +476,14 @@ export default function FollowTravelScreen({ route, navigation }) {
             }
             <View style={{ flex: 1 }}>
               <Text style={[styles.statusText, { color: statusColor(status) }]}>
-                {statusLabel(status)}
+                {statusLabel(status, t)}
               </Text>
               {status === 'accepted' && (
-                <Text style={styles.statusSub}>El conductor se dirige a recogerte</Text>
+                <Text style={styles.statusSub}>{t('follow_driver_pickup')}</Text>
               )}
               {status === 'ongoing' && (
                 <Text style={styles.statusSub}>
-                  {trip?.destination?.address ? `Hacia: ${trip.destination.address}` : 'En camino al destino'}
+                  {t('follow_to_dest', trip?.destination?.address)}
                 </Text>
               )}
             </View>
@@ -526,7 +528,7 @@ export default function FollowTravelScreen({ route, navigation }) {
             <View style={styles.payBlock}>
               <View style={styles.payHeader}>
                 <Icon name="card-outline" size={18} color={COLORS.primary} />
-                <Text style={styles.payTitle}>Pagar {formatCOP(fare)}</Text>
+                <Text style={styles.payTitle}>{t('follow_pay_title', formatCOP(fare))}</Text>
               </View>
 
               {payError ? <Text style={styles.payError}>{payError}</Text> : null}
@@ -534,7 +536,7 @@ export default function FollowTravelScreen({ route, navigation }) {
               {/* Saved cards */}
               {savedCards.length > 0 && (
                 <>
-                  <Text style={styles.payLabel}>Selecciona una tarjeta:</Text>
+                  <Text style={styles.payLabel}>{t('follow_pay_select')}</Text>
                   {savedCards.map(card => (
                     <TouchableOpacity
                       key={card.id}
@@ -557,12 +559,12 @@ export default function FollowTravelScreen({ route, navigation }) {
                       ? <ActivityIndicator color={COLORS.white} size="small" />
                       : <>
                           <Icon name="lock-closed-outline" size={18} color={COLORS.white} />
-                          <Text style={styles.primaryBtnText}>Pagar {formatCOP(fare)}</Text>
+                          <Text style={styles.primaryBtnText}>{t('follow_pay_saved_btn', formatCOP(fare))}</Text>
                         </>
                     }
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.altPayBtn} onPress={handlePayWithSheet} disabled={paying}>
-                    <Text style={styles.altPayText}>Usar otra tarjeta</Text>
+                    <Text style={styles.altPayText}>{t('follow_pay_other')}</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -573,7 +575,7 @@ export default function FollowTravelScreen({ route, navigation }) {
                   <View style={styles.testCardHint}>
                     <Icon name="information-circle-outline" size={14} color="#666" />
                     <Text style={styles.testCardText}>
-                      Modo prueba · Tarjeta: 4242 4242 4242 4242 · Cualquier fecha futura · CVC: 123
+                      {t('follow_pay_test')}
                     </Text>
                   </View>
                   <TouchableOpacity
@@ -585,7 +587,7 @@ export default function FollowTravelScreen({ route, navigation }) {
                       ? <ActivityIndicator color={COLORS.white} size="small" />
                       : <>
                           <Icon name="card-outline" size={18} color={COLORS.white} />
-                          <Text style={styles.primaryBtnText}>Ingresar tarjeta de pago</Text>
+                          <Text style={styles.primaryBtnText}>{t('follow_pay_new_btn')}</Text>
                         </>
                     }
                   </TouchableOpacity>
@@ -598,7 +600,7 @@ export default function FollowTravelScreen({ route, navigation }) {
           {status === 'completed' && !needsPayment && (
             <TouchableOpacity style={styles.primaryBtn} onPress={() => setRating(true)}>
               <Icon name="star-outline" size={18} color={COLORS.white} />
-              <Text style={styles.primaryBtnText}>Calificar conductor</Text>
+              <Text style={styles.primaryBtnText}>{t('follow_rate_btn')}</Text>
             </TouchableOpacity>
           )}
 
@@ -607,7 +609,7 @@ export default function FollowTravelScreen({ route, navigation }) {
               style={[styles.primaryBtn, { backgroundColor: COLORS.danger }]}
               onPress={() => { dispatch(clearTrip()); navigation.goBack(); }}
             >
-              <Text style={styles.primaryBtnText}>Volver al inicio</Text>
+              <Text style={styles.primaryBtnText}>{t('follow_back_home')}</Text>
             </TouchableOpacity>
           )}
 
@@ -621,7 +623,7 @@ export default function FollowTravelScreen({ route, navigation }) {
                 ? <ActivityIndicator size="small" color={COLORS.danger} />
                 : <>
                     <Icon name="close-circle-outline" size={18} color={COLORS.danger} />
-                    <Text style={styles.cancelText}>Cancelar viaje</Text>
+                    <Text style={styles.cancelText}>{t('follow_cancel_btn')}</Text>
                   </>
               }
             </TouchableOpacity>
@@ -635,7 +637,7 @@ export default function FollowTravelScreen({ route, navigation }) {
         visible={rating}
         onSubmit={handleRate}
         loading={ratingLoading}
-        title="Califica a tu conductor"
+        title={t('follow_rate_driver')}
       />
     </View>
   );

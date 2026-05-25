@@ -8,15 +8,16 @@ import { SafeAreaView }  from 'react-native-safe-area-context';
 import Icon              from 'react-native-vector-icons/Ionicons';
 import { getAuth, createUserWithEmailAndPassword, deleteUser } from '@react-native-firebase/auth';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from '../../hooks/useTranslation';
 import userApi     from '../../api/userApi';
 import logger      from '../../utils/logger';
 import ErrorBanner from '../../components/common/ErrorBanner';
 import { COLORS, SPACING, RADIUS, FONT, SHADOW } from '../../constants/theme';
 
 const GENDER_OPTIONS = [
-  { label: 'Masculino', value: 'male',   icon: 'male-outline' },
-  { label: 'Femenino',  value: 'female', icon: 'female-outline' },
-  { label: 'Otro',      value: 'other',  icon: 'person-outline' },
+  { labelKey: 'register_gender_male',   value: 'male',   icon: 'male-outline' },
+  { labelKey: 'register_gender_female', value: 'female', icon: 'female-outline' },
+  { labelKey: 'register_gender_other',  value: 'other',  icon: 'person-outline' },
 ];
 
 const LANGUAGE_OPTIONS = [
@@ -28,6 +29,7 @@ const EMPTY_ERRORS = { fullName: '', email: '', phone: '', gender: '', password:
 
 export default function RegisterScreen({ navigation }) {
   const { forceUserFound, refreshUser, signIn, signOut, firebaseUser, setIsRegistering } = useAuth();
+  const { t } = useTranslation();
 
   const isCompletingProfile = !!firebaseUser;
 
@@ -57,24 +59,24 @@ export default function RegisterScreen({ navigation }) {
     let valid = true;
 
     if (!form.fullName.trim() || form.fullName.trim().length < 3) {
-      errs.fullName = 'Mínimo 3 caracteres.'; valid = false;
+      errs.fullName = t('register_err_name'); valid = false;
     }
     if (!isCompletingProfile) {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-        errs.email = 'Formato inválido. Ejemplo: usuario@correo.com'; valid = false;
+        errs.email = t('register_err_email'); valid = false;
       }
       if (form.password.length < 6) {
-        errs.password = 'La contraseña debe tener al menos 6 caracteres.'; valid = false;
+        errs.password = t('register_err_pass'); valid = false;
       }
       if (form.password !== form.confirm) {
-        errs.confirm = 'Las contraseñas no coinciden.'; valid = false;
+        errs.confirm = t('register_err_confirm'); valid = false;
       }
     }
     if (!/^\d{7,}$/.test(form.phone)) {
-      errs.phone = 'Solo números, mínimo 7 dígitos.'; valid = false;
+      errs.phone = t('register_err_phone'); valid = false;
     }
     if (!form.gender) {
-      errs.gender = 'Selecciona un género para continuar.'; valid = false;
+      errs.gender = t('register_err_gender'); valid = false;
     }
 
     setFieldErrors(errs);
@@ -100,7 +102,7 @@ export default function RegisterScreen({ navigation }) {
         email = firebaseUser.email;
         logger.info('Register', `Reusing Firebase account: ${email}`);
       } else {
-        setStep('Creando cuenta en Firebase...');
+        setStep(t('register_step_firebase'));
         logger.step('Register', `Step 1 — Creating Firebase account: ${form.email.trim()}`);
         const credential = await createUserWithEmailAndPassword(
           getAuth(),
@@ -113,7 +115,7 @@ export default function RegisterScreen({ navigation }) {
         logger.ok('Register', `Step 1 ✓ Firebase UID: ${uid.slice(0, 8)}…`);
       }
 
-      setStep('Guardando tu perfil...');
+      setStep(t('register_step_profile'));
       logger.step('Register', 'Step 2 — Saving profile to Firestore…');
       const registered = await userApi.register({
         fullName:    form.fullName.trim(),
@@ -127,7 +129,7 @@ export default function RegisterScreen({ navigation }) {
       registerSucceeded = true;
       logger.ok('Register', 'Step 2 ✓ Profile saved to Firestore');
 
-      setStep('Entrando a la app...');
+      setStep(t('register_step_enter'));
       logger.step('Register', 'Step 3 — activating session in context…');
       // Set user directly from what we just wrote — no extra Firestore GET needed
       await forceUserFound(registered.data);
@@ -179,7 +181,7 @@ export default function RegisterScreen({ navigation }) {
         }
       }
 
-      setGlobalError(friendlyMessage(err.code, err.message, err.statusCode));
+      setGlobalError(friendlyMessage(err.code, err.message, err.statusCode, t));
     } finally {
       setIsRegistering(false);
       setLoading(false);
@@ -187,7 +189,8 @@ export default function RegisterScreen({ navigation }) {
     }
   };
 
-  const genderLabel = GENDER_OPTIONS.find(o => o.value === form.gender)?.label;
+  const genderOption = GENDER_OPTIONS.find(o => o.value === form.gender);
+  const genderLabel = genderOption ? t(genderOption.labelKey) : undefined;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -204,7 +207,7 @@ export default function RegisterScreen({ navigation }) {
           {/* ── Header ── */}
           <View style={styles.header}>
             <Text style={styles.title}>
-              {isCompletingProfile ? 'Completa tu perfil' : 'Crear cuenta'}
+              {isCompletingProfile ? t('register_complete') : t('register_title')}
             </Text>
             <Text style={styles.subtitle}>
               {isCompletingProfile
@@ -227,12 +230,12 @@ export default function RegisterScreen({ navigation }) {
             ) : null}
 
             {/* Full name */}
-            <Field label="Nombre completo" error={fieldErrors.fullName} required>
+            <Field label={t('personal_name_label')} error={fieldErrors.fullName} required>
               <View style={[styles.inputRow, fieldErrors.fullName && styles.inputRowError]}>
                 <Icon name="person-outline" size={18} color={COLORS.gray} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Tu nombre completo"
+                  placeholder={t('register_name_ph')}
                   placeholderTextColor={COLORS.gray}
                   value={form.fullName}
                   onChangeText={v => set('fullName', v.slice(0, 50))}
@@ -244,12 +247,12 @@ export default function RegisterScreen({ navigation }) {
 
             {/* Email */}
             {!isCompletingProfile && (
-              <Field label="Correo electrónico" error={fieldErrors.email} required>
+              <Field label={t('login_email_label')} error={fieldErrors.email} required>
                 <View style={[styles.inputRow, fieldErrors.email && styles.inputRowError]}>
                   <Icon name="mail-outline" size={18} color={COLORS.gray} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
-                    placeholder="usuario@correo.com"
+                    placeholder={t('register_email_ph')}
                     placeholderTextColor={COLORS.gray}
                     value={form.email}
                     onChangeText={v => set('email', v)}
@@ -264,7 +267,7 @@ export default function RegisterScreen({ navigation }) {
 
             {isCompletingProfile && (
               <View style={styles.fieldWrap}>
-                <Text style={styles.label}>Correo electrónico</Text>
+                <Text style={styles.label}>{t('login_email_label')}</Text>
                 <View style={[styles.inputRow, styles.inputRowReadonly]}>
                   <Icon name="mail-outline" size={18} color={COLORS.gray} style={styles.inputIcon} />
                   <Text style={[styles.input, { color: COLORS.gray }]}>{form.email}</Text>
@@ -274,7 +277,7 @@ export default function RegisterScreen({ navigation }) {
             )}
 
             {/* Phone */}
-            <Field label="Teléfono" error={fieldErrors.phone} required>
+            <Field label={t('personal_phone_label')} error={fieldErrors.phone} required>
               <View style={[styles.inputRow, fieldErrors.phone && styles.inputRowError]}>
                 <Icon name="call-outline" size={18} color={COLORS.gray} style={styles.inputIcon} />
                 <TextInput
@@ -290,7 +293,7 @@ export default function RegisterScreen({ navigation }) {
             </Field>
 
             {/* Gender */}
-            <Field label="Género" error={fieldErrors.gender} required>
+            <Field label={t('personal_gender_label')} error={fieldErrors.gender} required>
               <TouchableOpacity
                 style={[styles.inputRow, fieldErrors.gender && styles.inputRowError]}
                 onPress={() => setShowGenderModal(true)}
@@ -298,7 +301,7 @@ export default function RegisterScreen({ navigation }) {
               >
                 <Icon name="people-outline" size={18} color={COLORS.gray} style={styles.inputIcon} />
                 <Text style={[styles.input, { paddingVertical: 0, lineHeight: 50 }, !genderLabel && { color: COLORS.gray }]}>
-                  {genderLabel ?? 'Seleccionar género'}
+                  {genderLabel ?? t('register_select_gender')}
                 </Text>
                 <Icon name="chevron-down" size={16} color={COLORS.gray} />
               </TouchableOpacity>
@@ -306,7 +309,7 @@ export default function RegisterScreen({ navigation }) {
 
             {/* Language */}
             <View style={styles.fieldWrap}>
-              <Text style={styles.label}>Idioma preferido</Text>
+              <Text style={styles.label}>{t('prefs_lang_label')}</Text>
               <View style={styles.langRow}>
                 {LANGUAGE_OPTIONS.map(lang => (
                   <TouchableOpacity
@@ -386,7 +389,7 @@ export default function RegisterScreen({ navigation }) {
                       color={COLORS.white}
                     />
                     <Text style={styles.primaryBtnText}>
-                      {isCompletingProfile ? 'Guardar perfil' : 'Crear cuenta'}
+                      {isCompletingProfile ? t('register_save_btn') : t('register_btn')}
                     </Text>
                   </>
               }
@@ -399,8 +402,8 @@ export default function RegisterScreen({ navigation }) {
                 disabled={loading}
               >
                 <Text style={styles.loginLinkText}>
-                  ¿Ya tienes cuenta?{' '}
-                  <Text style={styles.loginLinkBold}>Inicia sesión</Text>
+                  {t('register_already')}{' '}
+                  <Text style={styles.loginLinkBold}>{t('register_login_link')}</Text>
                 </Text>
               </TouchableOpacity>
             )}
@@ -436,7 +439,7 @@ export default function RegisterScreen({ navigation }) {
         >
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Seleccionar género</Text>
+            <Text style={styles.modalTitle}>{t('register_select_gender')}</Text>
             <FlatList
               data={GENDER_OPTIONS}
               keyExtractor={item => item.value}
@@ -453,7 +456,7 @@ export default function RegisterScreen({ navigation }) {
                     />
                   </View>
                   <Text style={[styles.optionText, form.gender === item.value && styles.optionTextActive]}>
-                    {item.label}
+                    {t(item.labelKey)}
                   </Text>
                   {form.gender === item.value &&
                     <Icon name="checkmark-circle" size={22} color={COLORS.primary} />
@@ -489,15 +492,13 @@ function Field({ label, error, hint, required, children }) {
   );
 }
 
-// ── Firebase / Network → user-friendly messages (Spanish UI, English code) ──
-function friendlyMessage(code, fallback, statusCode) {
+// ── Firebase / Network → user-friendly messages ─────────────────────────────
+function friendlyMessage(code, fallback, statusCode, t) {
   const map = {
     'auth/email-already-in-use':
       'Ya existe una cuenta con ese correo. Si olvidaste tu contraseña, usa la opción "Olvidé mi contraseña" en el login.',
-    'auth/invalid-email':
-      'El formato del correo no es válido. Ejemplo: usuario@correo.com',
-    'auth/weak-password':
-      'La contraseña es muy débil. Usa al menos 6 caracteres con letras y números.',
+    'auth/invalid-email':    t('register_err_email'),
+    'auth/weak-password':    t('register_err_pass'),
     'auth/network-request-failed':
       'No se pudo conectar con Firebase. Verifica tu conexión a internet.',
     'auth/too-many-requests':
@@ -524,7 +525,7 @@ function friendlyMessage(code, fallback, statusCode) {
     return 'No se pudo conectar. Verifica tu conexión a internet e inténtalo de nuevo.';
   }
 
-  return fallback ?? 'Algo salió mal. Por favor intenta de nuevo.';
+  return fallback ?? t('login_err_default');
 }
 
 const styles = StyleSheet.create({

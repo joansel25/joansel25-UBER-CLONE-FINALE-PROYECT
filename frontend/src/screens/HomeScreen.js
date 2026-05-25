@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList,
   StyleSheet, Alert, ActivityIndicator, Platform,
-  KeyboardAvoidingView,
+  KeyboardAvoidingView, PermissionsAndroid,
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import Geolocation from '@react-native-community/geolocation';
@@ -18,6 +18,7 @@ import tripApi         from '../api/tripApi';
 import VehicleSelector from '../components/trip/VehicleSelector';
 import { formatCOP }   from '../utils/formatters';
 import { COLORS, RADIUS, FONT, SPACING, SHADOW } from '../constants/theme';
+import { useTranslation } from '../hooks/useTranslation';
 
 const MAX_FARE       = 50000;
 const DEBOUNCE_MS    = 400;
@@ -35,6 +36,7 @@ export default function HomeScreen({ navigation }) {
   const dispatch     = useDispatch();
   const { dbUser }   = useAuth();
   const { location } = useLocation();
+  const { t }        = useTranslation();
 
   const mapRef       = useRef(null);
   const debounceRef  = useRef(null);
@@ -57,7 +59,7 @@ export default function HomeScreen({ navigation }) {
   useEffect(() => {
     if (location && !originPlace) {
       const gpsPlace = {
-        address: 'Mi ubicación actual',
+        address: t('home_my_location'),
         lat:     location.latitude,
         lng:     location.longitude,
       };
@@ -125,7 +127,7 @@ export default function HomeScreen({ navigation }) {
       );
       setStep(STEP.READY);
     } catch (error) {
-      Alert.alert('Error de ruta', error.message || 'No se pudo calcular la ruta. Intenta de nuevo.');
+      Alert.alert(t('home_route_error'), t('home_route_error_msg', error.message));
       setStep(STEP.IDLE);
     }
   }, []);
@@ -161,23 +163,23 @@ export default function HomeScreen({ navigation }) {
         dispatch(setDestination(place));
 
         const currentOrigin = originPlace ?? (location
-          ? { address: 'Mi ubicación actual', lat: location.latitude, lng: location.longitude }
+          ? { address: t('home_my_location'), lat: location.latitude, lng: location.longitude }
           : null);
 
         if (currentOrigin) {
           if (!originPlace) {
             setOriginPlace(currentOrigin);
-            setOriginText('Mi ubicación actual');
+            setOriginText(t('home_my_location'));
             dispatch(setOrigin(currentOrigin));
           }
           calculateEstimate(currentOrigin, place);
         } else {
-          Alert.alert('Origen requerido', 'Por favor ingresa el punto de recogida antes de seleccionar el destino.');
+          Alert.alert(t('home_origin_req_title'), t('home_origin_req_msg'));
           setStep(STEP.IDLE);
         }
       }
     } catch (error) {
-      Alert.alert('Error', 'No se pudo obtener los detalles del lugar. Intenta de nuevo.');
+      Alert.alert('Error', t('home_place_error'));
       setStep(STEP.IDLE);
     }
   };
@@ -187,8 +189,8 @@ export default function HomeScreen({ navigation }) {
     const fare = estimate?.fares?.[selectedCategory]?.fare;
     if (fare > MAX_FARE) {
       Alert.alert(
-        'Límite de tarifa',
-        `La tarifa ${formatCOP(fare)} supera el máximo de ${formatCOP(MAX_FARE)}. Elige una categoría más económica.`,
+        t('home_fare_limit_title'),
+        t('home_fare_limit_msg', formatCOP(fare), formatCOP(MAX_FARE)),
       );
       return;
     }
@@ -196,7 +198,7 @@ export default function HomeScreen({ navigation }) {
     setStep(STEP.REQUESTING);
     try {
       const origin = originPlace ?? {
-        address: 'Mi ubicación actual',
+        address: t('home_my_location'),
         lat:     location.latitude,
         lng:     location.longitude,
       };
@@ -212,7 +214,7 @@ export default function HomeScreen({ navigation }) {
       dispatch(setActiveTrip(newTrip));
       navigation.navigate('FollowTravel', { tripId: newTrip._id });
     } catch (error) {
-      Alert.alert('Error', error.message || 'No se pudo crear el viaje. Intenta de nuevo.');
+      Alert.alert('Error', t('home_trip_error', error.message));
       setStep(STEP.READY);
     }
   };
@@ -282,18 +284,32 @@ export default function HomeScreen({ navigation }) {
       <TouchableOpacity
         style={styles.myLocationBtn}
         disabled={gettingGPS}
-        onPress={() => {
+        onPress={async () => {
+          if (Platform.OS === 'android') {
+            const already = await PermissionsAndroid.check(
+              PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+            );
+            if (!already) {
+              const result = await PermissionsAndroid.request(
+                PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+              );
+              if (result !== PermissionsAndroid.RESULTS.GRANTED) {
+                Alert.alert(t('home_gps_perm_title'), t('home_gps_perm_msg'));
+                return;
+              }
+            }
+          }
           setGettingGPS(true);
           Geolocation.getCurrentPosition(
             ({ coords }) => {
               setGettingGPS(false);
               const gpsPlace = {
-                address: 'Mi ubicación actual',
+                address: t('home_my_location'),
                 lat:     coords.latitude,
                 lng:     coords.longitude,
               };
               setOriginPlace(gpsPlace);
-              setOriginText('Mi ubicación actual');
+              setOriginText(t('home_my_location'));
               setActiveField(null);
               setSuggestions([]);
               dispatch(setOrigin(gpsPlace));
@@ -307,11 +323,17 @@ export default function HomeScreen({ navigation }) {
                 calculateEstimate(gpsPlace, destPlace);
               }
             },
-            () => {
+            (err) => {
               setGettingGPS(false);
-              Alert.alert('Ubicación', 'No se pudo obtener tu ubicación. Verifica que los permisos de ubicación estén activados.');
+              if (err.code === 1) {
+                Alert.alert(t('home_gps_perm_title'), t('home_gps_perm_msg'));
+              } else if (err.code === 2) {
+                Alert.alert(t('home_gps_title'), t('home_gps_unavailable'));
+              } else {
+                Alert.alert(t('home_gps_title'), t('home_gps_timeout'));
+              }
             },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 },
+            { enableHighAccuracy: false, timeout: 15000, maximumAge: 10000 },
           );
         }}
       >
@@ -330,7 +352,7 @@ export default function HomeScreen({ navigation }) {
 
           {/* Greeting */}
           <Text style={styles.greeting}>
-            Hola, {dbUser?.fullName?.split(' ')[0] ?? 'viajero'}
+            {t('home_greeting', dbUser?.fullName?.split(' ')[0] ?? t('home_traveler'))}
           </Text>
 
           {/* ── Origin input ── */}
@@ -338,7 +360,7 @@ export default function HomeScreen({ navigation }) {
             <View style={styles.dotOrigin} />
             <TextInput
               style={styles.locationInput}
-              placeholder="¿Desde dónde te recogemos?"
+              placeholder={t('home_origin_ph')}
               placeholderTextColor={COLORS.gray}
               value={originText}
               onFocus={() => {
@@ -379,7 +401,7 @@ export default function HomeScreen({ navigation }) {
             <TextInput
               ref={destInputRef}
               style={styles.locationInput}
-              placeholder="¿A dónde vas?"
+              placeholder={t('home_dest_ph')}
               placeholderTextColor={COLORS.gray}
               value={destText}
               onFocus={() => setActiveField('destination')}
@@ -421,7 +443,7 @@ export default function HomeScreen({ navigation }) {
                 </TouchableOpacity>
               )}
               ListEmptyComponent={() => (
-                <Text style={styles.noResults}>Sin resultados</Text>
+                <Text style={styles.noResults}>{t('home_no_results')}</Text>
               )}
             />
           )}
@@ -430,7 +452,7 @@ export default function HomeScreen({ navigation }) {
           {step === STEP.ESTIMATING && (
             <View style={styles.estimatingRow}>
               <ActivityIndicator color={COLORS.primary} />
-              <Text style={styles.estimatingText}>Calculando ruta y tarifa…</Text>
+              <Text style={styles.estimatingText}>{t('home_estimating')}</Text>
             </View>
           )}
 
@@ -452,10 +474,10 @@ export default function HomeScreen({ navigation }) {
 
               <View style={styles.fareRow}>
                 <View>
-                  <Text style={styles.fareLabel}>Tarifa estimada</Text>
+                  <Text style={styles.fareLabel}>{t('home_fare_label')}</Text>
                   {overLimit && (
                     <Text style={styles.limitWarning}>
-                      ⚠ Supera el límite de {formatCOP(MAX_FARE)}
+                      {t('home_fare_over', formatCOP(MAX_FARE))}
                     </Text>
                   )}
                 </View>
@@ -474,7 +496,7 @@ export default function HomeScreen({ navigation }) {
                   ? <ActivityIndicator color={COLORS.white} />
                   : <>
                       <Icon name="car" size={18} color={COLORS.white} />
-                      <Text style={styles.requestBtnText}>Solicitar viaje</Text>
+                      <Text style={styles.requestBtnText}>{t('home_request_btn')}</Text>
                     </>
                 }
               </TouchableOpacity>

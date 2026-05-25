@@ -6,12 +6,9 @@ import {
 import Icon              from 'react-native-vector-icons/Ionicons';
 import { launchImageLibrary } from 'react-native-image-picker';
 import storage           from '@react-native-firebase/storage';
+import { useTranslation } from '../../hooks/useTranslation';
 
-const GENDER_OPTIONS = [
-  { label: 'Masculino', value: 'male' },
-  { label: 'Femenino',  value: 'female' },
-  { label: 'Otro',      value: 'other' },
-];
+const GENDER_KEYS = ['male', 'female', 'other'];
 
 export default function PersonalInfoTab({
   formData      = { fullName: '', phone: '', gender: '', photo: null },
@@ -19,8 +16,11 @@ export default function PersonalInfoTab({
   onSave         = () => {},
   isSaving       = false,
 }) {
+  const { t } = useTranslation();
   const [showGenderModal, setShowGenderModal] = useState(false);
   const [uploadingPhoto,  setUploadingPhoto]  = useState(false);
+
+  const genderOptions = GENDER_KEYS.map(v => ({ value: v, label: t('register_gender_' + v) }));
 
   // ── Photo selection + Firebase Storage upload ─────────────────────────────
   const handleSelectPhoto = async () => {
@@ -31,7 +31,6 @@ export default function PersonalInfoTab({
       const asset = result.assets?.[0];
       if (!asset) return;
 
-      // Show local preview immediately while uploading
       updateFormData('photo', asset.uri);
       setUploadingPhoto(true);
 
@@ -40,11 +39,10 @@ export default function PersonalInfoTab({
       await ref.putFile(asset.uri);
       const downloadUrl = await ref.getDownloadURL();
 
-      // Persist the remote URL to backend right away
-      onSave({ profilePic: downloadUrl });
+      await onSave({ profilePic: downloadUrl });
       updateFormData('photo', downloadUrl);
-    } catch (error) {
-      Alert.alert('Error', 'No se pudo subir la foto. Intenta de nuevo.');
+    } catch {
+      Alert.alert('Error', t('personal_photo_error'));
     } finally {
       setUploadingPhoto(false);
     }
@@ -53,22 +51,23 @@ export default function PersonalInfoTab({
   // ── Save fullName + phone ─────────────────────────────────────────────────
   const handleSave = () => {
     if (!formData.fullName?.trim() || formData.fullName.trim().length < 3) {
-      Alert.alert('Error', 'El nombre debe tener al menos 3 caracteres.');
+      Alert.alert('Error', t('personal_name_error'));
       return;
     }
     if (!/^\d{7,}$/.test(formData.phone)) {
-      Alert.alert('Error', 'El teléfono debe tener al menos 7 dígitos.');
+      Alert.alert('Error', t('personal_phone_error'));
       return;
     }
     onSave({ fullName: formData.fullName.trim(), phone: formData.phone.trim() });
   };
 
-  const genderLabel =
-    GENDER_OPTIONS.find(o => o.value === formData.gender)?.label || '—';
+  const genderLabel = formData.gender
+    ? t('register_gender_' + formData.gender)
+    : '—';
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Información Personal</Text>
+      <Text style={styles.title}>{t('personal_title')}</Text>
 
       {/* Profile photo */}
       <View style={styles.photoSection}>
@@ -90,31 +89,31 @@ export default function PersonalInfoTab({
         >
           <Icon name="camera-outline" size={16} color="#007AFF" />
           <Text style={styles.changePhotoText}>
-            {uploadingPhoto ? 'Subiendo…' : 'Cambiar foto'}
+            {uploadingPhoto ? t('personal_uploading') : t('personal_change_photo')}
           </Text>
         </TouchableOpacity>
       </View>
 
       {/* Full name */}
       <View style={styles.field}>
-        <Text style={styles.label}>Nombre completo *</Text>
+        <Text style={styles.label}>{t('personal_name_label')}</Text>
         <TextInput
           style={styles.input}
-          placeholder="Tu nombre completo"
+          placeholder={t('personal_name_ph')}
           value={formData.fullName}
           onChangeText={v => updateFormData('fullName', v.length <= 50 ? v : formData.fullName)}
           maxLength={50}
           placeholderTextColor="#999"
         />
-        <Text style={styles.counter}>{(formData.fullName || '').length}/50 caracteres</Text>
+        <Text style={styles.counter}>{t('personal_name_counter', (formData.fullName || '').length)}</Text>
       </View>
 
       {/* Phone */}
       <View style={styles.field}>
-        <Text style={styles.label}>Teléfono *</Text>
+        <Text style={styles.label}>{t('personal_phone_label')}</Text>
         <TextInput
           style={styles.input}
-          placeholder="3001234567"
+          placeholder={t('personal_phone_ph')}
           value={formData.phone}
           onChangeText={v => updateFormData('phone', v.replace(/[^0-9]/g, ''))}
           keyboardType="numeric"
@@ -124,14 +123,14 @@ export default function PersonalInfoTab({
 
       {/* Gender — readonly, set at registration */}
       <View style={styles.field}>
-        <Text style={styles.label}>Género</Text>
+        <Text style={styles.label}>{t('personal_gender_label')}</Text>
         <View style={[styles.input, styles.readonlyRow]}>
           <Text style={styles.readonlyText}>{genderLabel}</Text>
           <View style={styles.readonlyBadge}>
-            <Text style={styles.readonlyBadgeText}>No editable</Text>
+            <Text style={styles.readonlyBadgeText}>{t('personal_not_editable')}</Text>
           </View>
         </View>
-        <Text style={styles.hint}>El género se define al crear la cuenta.</Text>
+        <Text style={styles.hint}>{t('personal_gender_hint')}</Text>
       </View>
 
       {/* Save button */}
@@ -143,7 +142,7 @@ export default function PersonalInfoTab({
       >
         {isSaving
           ? <ActivityIndicator color="#fff" />
-          : <Text style={styles.saveButtonText}>Guardar cambios</Text>
+          : <Text style={styles.saveButtonText}>{t('personal_save')}</Text>
         }
       </TouchableOpacity>
 
@@ -160,9 +159,9 @@ export default function PersonalInfoTab({
           onPress={() => setShowGenderModal(false)}
         >
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Género</Text>
+            <Text style={styles.modalTitle}>{t('personal_gender_label')}</Text>
             <FlatList
-              data={GENDER_OPTIONS}
+              data={genderOptions}
               keyExtractor={item => item.value}
               renderItem={({ item }) => (
                 <View style={styles.optionRow}>

@@ -6,10 +6,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon     from 'react-native-vector-icons/Ionicons';
 import Config   from 'react-native-config';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from '../hooks/useTranslation';
 import { COLORS, SPACING, FONT, RADIUS, SHADOW } from '../constants/theme';
 
 export default function ConnectionErrorScreen() {
   const { signOut, refreshUser } = useAuth();
+  const { t } = useTranslation();
   const [retrying, setRetrying] = useState(false);
   const [error,    setError]    = useState('');
 
@@ -18,8 +20,8 @@ export default function ConnectionErrorScreen() {
     setError('');
     try {
       await refreshUser();
-    } catch (err) {
-      setError('No se pudo conectar con el servidor. Verifica tu conexión.');
+    } catch {
+      setError(t('conn_error'));
     } finally {
       setRetrying(false);
     }
@@ -34,14 +36,11 @@ export default function ConnectionErrorScreen() {
           <Icon name="cloud-offline-outline" size={52} color={COLORS.danger} />
         </View>
 
-        <Text style={styles.title}>Sin conexión al servidor</Text>
-        <Text style={styles.body}>
-          Tu sesión de Firebase está activa, pero no se puede alcanzar el servidor backend.
-        </Text>
+        <Text style={styles.title}>{t('conn_title')}</Text>
+        <Text style={styles.body}>{t('conn_body')}</Text>
 
-        {/* Debug info — always visible to aid diagnosis */}
         <View style={styles.debugBox}>
-          <Text style={styles.debugLabel}>API_URL configurada:</Text>
+          <Text style={styles.debugLabel}>{t('conn_api_label')}</Text>
           <Text style={styles.debugValue}>{apiUrl}</Text>
           <Text style={styles.debugHint}>
             {apiUrl.includes('10.0.2.2')
@@ -64,19 +63,19 @@ export default function ConnectionErrorScreen() {
             ? <ActivityIndicator color={COLORS.white} size="small" />
             : <>
                 <Icon name="refresh-outline" size={18} color={COLORS.white} />
-                <Text style={styles.btnText}>Reintentar conexión</Text>
+                <Text style={styles.btnText}>{t('conn_retry')}</Text>
               </>
           }
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.logoutBtn}
-          onPress={signOut}
+          onPress={() => { signOut().catch(() => {}); }}
           disabled={retrying}
           activeOpacity={0.85}
         >
           <Icon name="log-out-outline" size={16} color={COLORS.danger} />
-          <Text style={styles.logoutText}>Cerrar sesión</Text>
+          <Text style={styles.logoutText}>{t('conn_logout')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

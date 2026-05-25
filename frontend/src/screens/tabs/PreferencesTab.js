@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import CountryFlag from 'react-native-country-flag';
 import Icon       from 'react-native-vector-icons/Ionicons';
+import { useTranslation } from '../../hooks/useTranslation';
 
 const LANGUAGES = [
   { label: 'Español', value: 'ES', isoCode: 'CO' },
@@ -16,22 +17,17 @@ export default function PreferencesTab({
   onSave         = () => {},
   isSaving       = false,
 }) {
+  const { t } = useTranslation();
   const handleSave = () => onSave({ language: formData.language });
-
-  const isES = formData.language === 'ES';
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Preferencias</Text>
+      <Text style={styles.title}>{t('prefs_title')}</Text>
 
       {/* Language selector */}
       <View style={styles.field}>
-        <Text style={styles.label}>Idioma preferido *</Text>
-        <Text style={styles.description}>
-          {isES
-            ? 'Selecciona el idioma de la aplicación'
-            : 'Select the application language'}
-        </Text>
+        <Text style={styles.label}>{t('prefs_lang_label')}</Text>
+        <Text style={styles.description}>{t('prefs_lang_desc')}</Text>
 
         <View style={styles.languageButtons}>
           {LANGUAGES.map(lang => (
@@ -59,27 +55,14 @@ export default function PreferencesTab({
         </View>
       </View>
 
-      {/* Preview — matches Carlos's original behaviour */}
+      {/* Preview */}
       <View style={styles.previewBox}>
-        <Text style={styles.previewTitle}>
-          {isES ? 'Vista previa — Español' : 'Preview — English'}
-        </Text>
+        <Text style={styles.previewTitle}>{t('prefs_preview_title')}</Text>
         <View style={styles.previewContent}>
-          <Text style={styles.previewText}>
-            {isES ? `✓ Nombre: ${formData.fullName || 'Sin ingresar'}`
-                  : `✓ Name: ${formData.fullName || 'Not entered'}`}
-          </Text>
-          <Text style={styles.previewText}>
-            {isES ? `✓ Teléfono: ${formData.phone || 'Sin ingresar'}`
-                  : `✓ Phone: ${formData.phone || 'Not entered'}`}
-          </Text>
-          <Text style={styles.previewText}>
-            {isES ? `✓ Correo: ${formData.email || 'Sin ingresar'}`
-                  : `✓ Email: ${formData.email || 'Not entered'}`}
-          </Text>
-          <Text style={styles.previewText}>
-            {isES ? '✓ Idioma: Español' : '✓ Language: English'}
-          </Text>
+          <Text style={styles.previewText}>{t('prefs_preview_name',  formData.fullName)}</Text>
+          <Text style={styles.previewText}>{t('prefs_preview_phone', formData.phone)}</Text>
+          <Text style={styles.previewText}>{t('prefs_preview_email', formData.email)}</Text>
+          <Text style={styles.previewText}>{t('prefs_preview_lang')}</Text>
         </View>
       </View>
 
@@ -92,28 +75,20 @@ export default function PreferencesTab({
       >
         {isSaving
           ? <ActivityIndicator color="#fff" />
-          : <Text style={styles.saveButtonText}>
-              {isES ? 'Guardar preferencias' : 'Save preferences'}
-            </Text>
+          : <Text style={styles.saveButtonText}>{t('prefs_save')}</Text>
         }
       </TouchableOpacity>
 
       {/* Account info */}
       <View style={styles.infoBox}>
-        <Text style={styles.infoTitle}>
-          {isES ? 'Sobre tu cuenta' : 'About your account'}
+        <Text style={styles.infoTitle}>{t('prefs_about')}</Text>
+        <Text style={styles.infoText}>
+          <Icon name="information-circle-outline" size={13} color="#007AFF" />
+          {t('prefs_info1')}
         </Text>
         <Text style={styles.infoText}>
           <Icon name="information-circle-outline" size={13} color="#007AFF" />
-          {isES
-            ? '  El correo y el género no son editables.'
-            : '  Email and gender cannot be changed.'}
-        </Text>
-        <Text style={styles.infoText}>
-          <Icon name="information-circle-outline" size={13} color="#007AFF" />
-          {isES
-            ? '  Nombre, teléfono e idioma sí pueden actualizarse.'
-            : '  Full name, phone and language can be updated.'}
+          {t('prefs_info2')}
         </Text>
       </View>
 

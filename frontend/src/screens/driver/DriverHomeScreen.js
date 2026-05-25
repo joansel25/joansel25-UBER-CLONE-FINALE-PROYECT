@@ -10,17 +10,18 @@ import Geolocation from '@react-native-community/geolocation';
 import driverApi  from '../../api/driverApi';
 import tripApi    from '../../api/tripApi';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from '../../hooks/useTranslation';
 import RatingModal from '../../components/trip/RatingModal';
 import ErrorBanner from '../../components/common/ErrorBanner';
 import { COLORS, SPACING, FONT, RADIUS, SHADOW } from '../../constants/theme';
 import { formatCOP, formatDistance, formatDuration } from '../../utils/formatters';
 
-// ── Driver status config ────────────────────────────────────────────────────
+// ── Driver status config (labels resolved via t() at render time) ───────────
 
 const STATUS_CONFIG = {
-  offline:   { label: 'Desconectado', color: COLORS.gray,    icon: 'power-outline' },
-  available: { label: 'Disponible',   color: COLORS.success,  icon: 'checkmark-circle-outline' },
-  busy:      { label: 'En viaje',     color: COLORS.warning,  icon: 'car-outline' },
+  offline:   { labelKey: 'driver_offline',   color: COLORS.gray,    icon: 'power-outline' },
+  available: { labelKey: 'driver_available', color: COLORS.success,  icon: 'checkmark-circle-outline' },
+  busy:      { labelKey: 'driver_busy',      color: COLORS.warning,  icon: 'car-outline' },
 };
 
 const LOCATION_INTERVAL = 12000; // ms between location broadcasts
@@ -29,6 +30,7 @@ const LOCATION_INTERVAL = 12000; // ms between location broadcasts
 
 export default function DriverHomeScreen() {
   const { dbUser } = useAuth();
+  const { t } = useTranslation();
 
   const [driverDoc,      setDriverDoc]      = useState(null);   // Driver MongoDB doc
   const [driverStatus,   setDriverStatus]   = useState('offline');
@@ -57,7 +59,7 @@ export default function DriverHomeScreen() {
         setDriverDoc(doc);
         setDriverStatus(doc.status);
       } catch (err) {
-        setError('No se encontró tu perfil de conductor. Regístrate primero.');
+        setError(t('driver_no_profile'));
       } finally {
         setLoadingInit(false);
       }
@@ -140,7 +142,7 @@ export default function DriverHomeScreen() {
         stopTripsPoll();
       }
     } catch {
-      setError('No se pudo cambiar el estado. Intenta de nuevo.');
+      setError(t('driver_status_error'));
     } finally {
       setStatusChanging(false);
     }
@@ -177,7 +179,7 @@ export default function DriverHomeScreen() {
       }, 5000);
 
     } catch (err) {
-      setError('No se pudo aceptar el viaje. Ya fue tomado por otro conductor.');
+      setError(t('driver_accept_error'));
       fetchAvailableTrips();
     } finally {
       setAcceptingId(null);
@@ -193,7 +195,7 @@ export default function DriverHomeScreen() {
       await tripApi.start(activeTrip._id);
       setTripPhase('ongoing');
     } catch (err) {
-      setError('Error al iniciar el viaje.');
+      setError(t('driver_start_error'));
     } finally {
       setActionLoading(false);
     }
@@ -211,7 +213,7 @@ export default function DriverHomeScreen() {
       setTripPhase('completed');
       setRatingVisible(true);
     } catch (err) {
-      setError('Error al completar el viaje.');
+      setError(t('driver_complete_error'));
     } finally {
       setActionLoading(false);
     }
@@ -261,7 +263,7 @@ export default function DriverHomeScreen() {
           <ErrorBanner message={error} onDismiss={() => setError('')} />
 
           <Text style={styles.activeTripTitle}>
-            {tripPhase === 'accepted' ? 'Recoge al pasajero' : 'Viaje en curso'}
+            {tripPhase === 'accepted' ? t('driver_pickup') : t('driver_ongoing')}
           </Text>
 
           {passenger && (
@@ -301,7 +303,7 @@ export default function DriverHomeScreen() {
                 ? <ActivityIndicator color={COLORS.white} />
                 : <>
                     <Icon name="play-circle-outline" size={20} color={COLORS.white} />
-                    <Text style={styles.actionBtnText}>El pasajero abordó — Iniciar viaje</Text>
+                    <Text style={styles.actionBtnText}>{t('driver_start_btn')}</Text>
                   </>
               }
             </TouchableOpacity>
@@ -317,7 +319,7 @@ export default function DriverHomeScreen() {
                 ? <ActivityIndicator color={COLORS.white} />
                 : <>
                     <Icon name="checkmark-circle-outline" size={20} color={COLORS.white} />
-                    <Text style={styles.actionBtnText}>Llegamos — Completar viaje</Text>
+                    <Text style={styles.actionBtnText}>{t('driver_complete_btn')}</Text>
                   </>
               }
             </TouchableOpacity>
@@ -328,7 +330,7 @@ export default function DriverHomeScreen() {
           visible={ratingVisible}
           onSubmit={handleRate}
           loading={ratingLoading}
-          title="Califica al pasajero"
+          title={t('driver_rate_passenger')}
         />
       </SafeAreaView>
     );
@@ -348,7 +350,7 @@ export default function DriverHomeScreen() {
         <View style={styles.statusCard}>
           <View style={styles.statusHeader}>
             <View style={[styles.statusDot, { backgroundColor: cfg.color }]} />
-            <Text style={styles.statusLabel}>{cfg.label}</Text>
+            <Text style={styles.statusLabel}>{t(cfg.labelKey)}</Text>
             {statusChanging && <ActivityIndicator size="small" color={COLORS.gray} style={{ marginLeft: 8 }} />}
           </View>
 
@@ -372,7 +374,7 @@ export default function DriverHomeScreen() {
                   styles.statusBtnText,
                   driverStatus === s && { color: COLORS.white },
                 ]}>
-                  {STATUS_CONFIG[s].label}
+                  {t(STATUS_CONFIG[s].labelKey)}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -383,21 +385,22 @@ export default function DriverHomeScreen() {
         {driverStatus === 'available' && (
           <View style={styles.tripsSection}>
             <Text style={styles.sectionTitle}>
-              Viajes disponibles ({availableTrips.length})
+              {t('driver_trips', availableTrips.length)}
             </Text>
 
             {availableTrips.length === 0 ? (
               <View style={styles.emptyTrips}>
                 <Icon name="search-outline" size={40} color={COLORS.border} />
-                <Text style={styles.emptyText}>Buscando solicitudes…</Text>
+                <Text style={styles.emptyText}>{t('driver_searching')}</Text>
               </View>
             ) : (
-              availableTrips.map(t => (
+              availableTrips.map(trip => (
                 <TripCard
-                  key={t._id}
-                  trip={t}
-                  loading={acceptingId === t._id}
-                  onAccept={() => handleAccept(t)}
+                  key={trip._id}
+                  trip={trip}
+                  loading={acceptingId === trip._id}
+                  onAccept={() => handleAccept(trip)}
+                  t={t}
                 />
               ))
             )}
@@ -407,9 +410,7 @@ export default function DriverHomeScreen() {
         {driverStatus === 'offline' && (
           <View style={styles.offlineHint}>
             <Icon name="power-outline" size={48} color={COLORS.border} />
-            <Text style={styles.offlineText}>
-              Activa tu disponibilidad para ver solicitudes de viaje.
-            </Text>
+            <Text style={styles.offlineText}>{t('driver_offline_hint')}</Text>
           </View>
         )}
       </ScrollView>
@@ -419,7 +420,7 @@ export default function DriverHomeScreen() {
 
 // ── Trip card ───────────────────────────────────────────────────────────────
 
-function TripCard({ trip, loading, onAccept }) {
+function TripCard({ trip, loading, onAccept, t }) {
   const { origin, destination, fare, distance, duration, passenger, vehicleCategory } = trip;
   return (
     <View style={styles.tripCard}>
@@ -472,7 +473,7 @@ function TripCard({ trip, loading, onAccept }) {
           ? <ActivityIndicator color={COLORS.white} size="small" />
           : <>
               <Icon name="checkmark-outline" size={18} color={COLORS.white} />
-              <Text style={styles.acceptBtnText}>Aceptar viaje</Text>
+              <Text style={styles.acceptBtnText}>{t('driver_accept')}</Text>
             </>
         }
       </TouchableOpacity>

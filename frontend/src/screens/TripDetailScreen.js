@@ -9,24 +9,25 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import tripApi    from '../api/tripApi';
 import paymentApi from '../api/paymentApi';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from '../hooks/useTranslation';
 import { COLORS, SPACING, FONT, RADIUS, SHADOW } from '../constants/theme';
 import { formatCOP, formatDate, formatTime, formatDistance, formatDuration } from '../utils/formatters';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
 const STATUS = {
-  requested: { label: 'Solicitado',  color: '#FF9500', bg: '#FFF3E0', icon: 'time-outline' },
-  accepted:  { label: 'Aceptado',    color: '#007AFF', bg: '#E3F2FD', icon: 'checkmark-outline' },
-  ongoing:   { label: 'En curso',    color: '#5856D6', bg: '#EEF2FF', icon: 'navigate-outline' },
-  completed: { label: 'Completado',  color: '#34C759', bg: '#F0FFF4', icon: 'checkmark-circle-outline' },
-  cancelled: { label: 'Cancelado',   color: '#FF3B30', bg: '#FFF0F0', icon: 'close-circle-outline' },
+  requested: { color: '#FF9500', bg: '#FFF3E0', icon: 'time-outline' },
+  accepted:  { color: '#007AFF', bg: '#E3F2FD', icon: 'checkmark-outline' },
+  ongoing:   { color: '#5856D6', bg: '#EEF2FF', icon: 'navigate-outline' },
+  completed: { color: '#34C759', bg: '#F0FFF4', icon: 'checkmark-circle-outline' },
+  cancelled: { color: '#FF3B30', bg: '#FFF0F0', icon: 'close-circle-outline' },
 };
 
 const TX_STATUS = {
-  pending:   { label: 'Pendiente', color: '#FF9500' },
-  completed: { label: 'Pagado',    color: '#34C759' },
-  failed:    { label: 'Fallido',   color: '#FF3B30' },
-  refunded:  { label: 'Reembolsado', color: '#5856D6' },
+  pending:   { color: '#FF9500' },
+  completed: { color: '#34C759' },
+  failed:    { color: '#FF3B30' },
+  refunded:  { color: '#5856D6' },
 };
 
 const VEHICLE_LABEL = { economy: 'Economy', xl: 'XL', premium: 'Premium' };
@@ -48,6 +49,7 @@ function InfoRow({ icon, label, value, valueColor }) {
 export default function TripDetailScreen({ route, navigation }) {
   const { tripId } = route.params;
   const { dbUser } = useAuth();
+  const { t } = useTranslation();
 
   const [trip,    setTrip]    = useState(null);
   const [tx,      setTx]      = useState(null);
@@ -70,7 +72,7 @@ export default function TripDetailScreen({ route, navigation }) {
             .catch(() => {});
         }
       } catch {
-        setError('No se pudo cargar el detalle del viaje.');
+        setError(t('detail_error'));
       } finally {
         setLoading(false);
       }
@@ -91,7 +93,7 @@ export default function TripDetailScreen({ route, navigation }) {
         <Icon name="alert-circle-outline" size={48} color={COLORS.danger} />
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backBtnText}>Volver</Text>
+          <Text style={styles.backBtnText}>{t('detail_back')}</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -100,7 +102,7 @@ export default function TripDetailScreen({ route, navigation }) {
   const st = STATUS[trip.status] ?? STATUS.completed;
   const isDriver = trip.driver?._id === dbUser?._id || trip.driver === dbUser?._id;
   const other    = isDriver ? trip.passenger : trip.driver;
-  const otherRole = isDriver ? 'Pasajero' : 'Conductor';
+  const otherRole = isDriver ? t('detail_passenger') : t('detail_driver');
 
   const myRating   = isDriver ? trip.driverRatingPassenger : trip.passengerRatingDriver;
   const theirRating = isDriver ? trip.passengerRatingDriver : trip.driverRatingPassenger;
@@ -113,7 +115,7 @@ export default function TripDetailScreen({ route, navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backIcon}>
           <Icon name="arrow-back" size={22} color={COLORS.dark} />
         </TouchableOpacity>
-        <Text style={styles.title}>Detalle del viaje</Text>
+        <Text style={styles.title}>{t('detail_title')}</Text>
         <View style={{ width: 36 }} />
       </View>
 
@@ -122,18 +124,18 @@ export default function TripDetailScreen({ route, navigation }) {
         {/* Status banner */}
         <View style={[styles.statusBanner, { backgroundColor: st.bg }]}>
           <Icon name={st.icon} size={22} color={st.color} />
-          <Text style={[styles.statusLabel, { color: st.color }]}>{st.label}</Text>
+          <Text style={[styles.statusLabel, { color: st.color }]}>{t('status_' + trip.status)}</Text>
           <Text style={styles.statusFare}>{formatCOP(trip.fare)}</Text>
         </View>
 
         {/* Route */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Ruta</Text>
+          <Text style={styles.sectionTitle}>{t('detail_route')}</Text>
           <View style={styles.routeCard}>
             <View style={styles.routeRow}>
               <View style={[styles.routeDot, { backgroundColor: COLORS.primary }]} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.routeLabel}>Origen</Text>
+                <Text style={styles.routeLabel}>{t('detail_origin')}</Text>
                 <Text style={styles.routeAddress}>{trip.origin?.address ?? '—'}</Text>
               </View>
             </View>
@@ -141,7 +143,7 @@ export default function TripDetailScreen({ route, navigation }) {
             <View style={styles.routeRow}>
               <View style={[styles.routeDot, { backgroundColor: COLORS.danger }]} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.routeLabel}>Destino</Text>
+                <Text style={styles.routeLabel}>{t('detail_destination')}</Text>
                 <Text style={styles.routeAddress}>{trip.destination?.address ?? '—'}</Text>
               </View>
             </View>
@@ -150,17 +152,17 @@ export default function TripDetailScreen({ route, navigation }) {
 
         {/* Trip details */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Información del viaje</Text>
+          <Text style={styles.sectionTitle}>{t('detail_info')}</Text>
           <View style={styles.infoCard}>
-            <InfoRow icon="calendar-outline"   label="Fecha"          value={formatDate(trip.createdAt)} />
-            <InfoRow icon="time-outline"        label="Hora"           value={formatTime(trip.createdAt)} />
-            {trip.distance  != null && <InfoRow icon="map-outline"    label="Distancia"     value={formatDistance(trip.distance)} />}
-            {trip.duration  != null && <InfoRow icon="stopwatch-outline" label="Duración"   value={formatDuration(trip.duration)} />}
-            <InfoRow icon="car-outline"         label="Categoría"      value={VEHICLE_LABEL[trip.vehicleCategory] ?? trip.vehicleCategory} />
+            <InfoRow icon="calendar-outline"   label={t('detail_date')}     value={formatDate(trip.createdAt)} />
+            <InfoRow icon="time-outline"        label={t('detail_time')}     value={formatTime(trip.createdAt)} />
+            {trip.distance  != null && <InfoRow icon="map-outline"    label={t('detail_distance')} value={formatDistance(trip.distance)} />}
+            {trip.duration  != null && <InfoRow icon="stopwatch-outline" label={t('detail_duration')} value={formatDuration(trip.duration)} />}
+            <InfoRow icon="car-outline"         label={t('detail_category')} value={VEHICLE_LABEL[trip.vehicleCategory] ?? trip.vehicleCategory} />
             <InfoRow
               icon="wallet-outline"
-              label="Método de pago"
-              value={trip.paymentMethod === 'card' ? 'Tarjeta' : 'Efectivo'}
+              label={t('detail_pay_method')}
+              value={trip.paymentMethod === 'card' ? t('detail_card') : t('detail_cash')}
             />
           </View>
         </View>
@@ -189,18 +191,18 @@ export default function TripDetailScreen({ route, navigation }) {
         {/* Ratings */}
         {trip.status === 'completed' && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Calificaciones</Text>
+            <Text style={styles.sectionTitle}>{t('detail_ratings')}</Text>
             <View style={styles.infoCard}>
               <InfoRow
                 icon="star-outline"
-                label="Tu calificación"
-                value={myRating != null ? '★'.repeat(myRating) + ` (${myRating}/5)` : 'Sin calificar'}
+                label={t('detail_my_rating')}
+                value={myRating != null ? '★'.repeat(myRating) + ` (${myRating}/5)` : t('detail_unrated')}
                 valueColor={myRating != null ? '#FFD700' : COLORS.gray}
               />
               <InfoRow
                 icon="star-outline"
-                label={`Calificación del ${otherRole.toLowerCase()}`}
-                value={theirRating != null ? '★'.repeat(theirRating) + ` (${theirRating}/5)` : 'Sin calificar'}
+                label={t('detail_their_rating', otherRole)}
+                value={theirRating != null ? '★'.repeat(theirRating) + ` (${theirRating}/5)` : t('detail_unrated')}
                 valueColor={theirRating != null ? '#FFD700' : COLORS.gray}
               />
             </View>
@@ -210,17 +212,17 @@ export default function TripDetailScreen({ route, navigation }) {
         {/* Transaction */}
         {tx && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Pago</Text>
+            <Text style={styles.sectionTitle}>{t('detail_payment')}</Text>
             <View style={styles.infoCard}>
-              <InfoRow icon="cash-outline"    label="Monto"   value={formatCOP(tx.amount)} />
-              <InfoRow icon="card-outline"    label="Método"  value="Tarjeta de crédito/débito" />
+              <InfoRow icon="cash-outline"    label={t('detail_amount')} value={formatCOP(tx.amount)} />
+              <InfoRow icon="card-outline"    label={t('detail_method')} value={t('detail_card_full')} />
               <InfoRow
                 icon="checkmark-circle-outline"
-                label="Estado"
-                value={(TX_STATUS[tx.status] ?? { label: tx.status }).label}
+                label={t('detail_pay_status')}
+                value={t('tx_' + tx.status) ?? tx.status}
                 valueColor={(TX_STATUS[tx.status] ?? {}).color}
               />
-              <InfoRow icon="calendar-outline" label="Fecha"  value={formatDate(tx.createdAt)} />
+              <InfoRow icon="calendar-outline" label={t('detail_date')} value={formatDate(tx.createdAt)} />
             </View>
           </View>
         )}

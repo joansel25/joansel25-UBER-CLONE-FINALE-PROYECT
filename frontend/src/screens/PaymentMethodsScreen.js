@@ -10,6 +10,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 
 import paymentApi   from '../api/paymentApi';
 import ErrorBanner  from '../components/common/ErrorBanner';
+import { useTranslation } from '../hooks/useTranslation';
 import { COLORS, SPACING, FONT, RADIUS, SHADOW } from '../constants/theme';
 
 // Brand icon names (Ionicons doesn't have card brand icons, use generic card icon)
@@ -22,6 +23,7 @@ const BRAND_LABELS = {
 
 export default function PaymentMethodsScreen({ navigation }) {
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const { t } = useTranslation();
 
   const [cards,      setCards]      = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -35,7 +37,7 @@ export default function PaymentMethodsScreen({ navigation }) {
       const res = await paymentApi.listCards();
       setCards(res.data ?? []);
     } catch {
-      setError('No se pudieron cargar tus métodos de pago.');
+      setError(t('pay_methods_load_err'));
     } finally {
       setLoading(false);
     }
@@ -64,7 +66,7 @@ export default function PaymentMethodsScreen({ navigation }) {
       const { error: presentError } = await presentPaymentSheet();
       if (presentError) {
         if (presentError.code !== 'Canceled') {
-          setError('No se pudo guardar la tarjeta. Intenta de nuevo.');
+          setError(t('pay_methods_add_err'));
         }
         return;
       }
@@ -80,12 +82,12 @@ export default function PaymentMethodsScreen({ navigation }) {
 
   const confirmDelete = (card) => {
     Alert.alert(
-      'Eliminar tarjeta',
-      `¿Eliminar ${BRAND_LABELS[card.brand] ?? card.brand} ****${card.last4}?`,
+      t('pay_methods_del_title'),
+      t('pay_methods_del_msg', BRAND_LABELS[card.brand] ?? card.brand, card.last4),
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t('pay_methods_del_cancel'), style: 'cancel' },
         {
-          text: 'Eliminar',
+          text: t('pay_methods_del_btn'),
           style: 'destructive',
           onPress: () => handleDeleteCard(card.id),
         },
@@ -100,7 +102,7 @@ export default function PaymentMethodsScreen({ navigation }) {
       await paymentApi.deleteCard(pmId);
       setCards(prev => prev.filter(c => c.id !== pmId));
     } catch {
-      setError('No se pudo eliminar la tarjeta. Intenta de nuevo.');
+      setError(t('pay_methods_del_err'));
     } finally {
       setDeletingId(null);
     }
@@ -118,7 +120,7 @@ export default function PaymentMethodsScreen({ navigation }) {
           {BRAND_LABELS[item.brand] ?? item.brand}  ****{item.last4}
         </Text>
         <Text style={styles.cardExpiry}>
-          Vence {String(item.expMonth).padStart(2, '0')}/{item.expYear}
+          {t('pay_methods_expires')} {String(item.expMonth).padStart(2, '0')}/{item.expYear}
         </Text>
       </View>
       {deletingId === item.id
@@ -143,7 +145,7 @@ export default function PaymentMethodsScreen({ navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Icon name="arrow-back" size={22} color={COLORS.dark} />
         </TouchableOpacity>
-        <Text style={styles.title}>Métodos de pago</Text>
+        <Text style={styles.title}>{t('pay_methods_title')}</Text>
         <View style={{ width: 36 }} />
       </View>
 
@@ -153,7 +155,7 @@ export default function PaymentMethodsScreen({ navigation }) {
       <View style={styles.testBanner}>
         <Icon name="information-circle-outline" size={14} color="#666" />
         <Text style={styles.testBannerText}>
-          Modo prueba · Usa 4242 4242 4242 4242 · Fecha: 12/34 · CVC: 123
+          {t('pay_methods_test')}
         </Text>
       </View>
 
@@ -171,10 +173,8 @@ export default function PaymentMethodsScreen({ navigation }) {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Icon name="card-outline" size={56} color={COLORS.border} />
-              <Text style={styles.emptyTitle}>Sin métodos de pago</Text>
-              <Text style={styles.emptySubtitle}>
-                Agrega una tarjeta para pagar tus viajes de forma rápida.
-              </Text>
+              <Text style={styles.emptyTitle}>{t('pay_methods_empty')}</Text>
+              <Text style={styles.emptySubtitle}>{t('pay_methods_empty_sub')}</Text>
             </View>
           }
           ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -193,7 +193,7 @@ export default function PaymentMethodsScreen({ navigation }) {
             ? <ActivityIndicator color={COLORS.white} size="small" />
             : <>
                 <Icon name="add-circle-outline" size={20} color={COLORS.white} />
-                <Text style={styles.addBtnText}>Agregar tarjeta</Text>
+                <Text style={styles.addBtnText}>{t('pay_methods_add')}</Text>
               </>
           }
         </TouchableOpacity>

@@ -1,15 +1,18 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useTranslation } from '../../hooks/useTranslation';
 
 export default function ContactTab({ formData = { email: '', phone: '' }, rating }) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Información de Contacto</Text>
+      <Text style={styles.title}>{t('contact_title')}</Text>
 
       {/* Email — immutable after registration */}
       <View style={styles.field}>
-        <Text style={styles.label}>Correo electrónico</Text>
+        <Text style={styles.label}>{t('contact_email_label')}</Text>
         <View style={styles.readonlyBox}>
           <Icon name="mail-outline" size={18} color="#666" style={styles.fieldIcon} />
           <Text style={styles.readonlyText}>{formData.email || '—'}</Text>
@@ -17,25 +20,23 @@ export default function ContactTab({ formData = { email: '', phone: '' }, rating
             <Icon name="lock-closed" size={12} color="#888" />
           </View>
         </View>
-        <Text style={styles.hint}>
-          El correo no puede modificarse. Es el identificador de tu cuenta.
-        </Text>
+        <Text style={styles.hint}>{t('contact_email_hint')}</Text>
       </View>
 
       {/* Phone — display only (editable via Personal tab) */}
       <View style={styles.field}>
-        <Text style={styles.label}>Teléfono</Text>
+        <Text style={styles.label}>{t('contact_phone_label')}</Text>
         <View style={styles.readonlyBox}>
           <Icon name="call-outline" size={18} color="#666" style={styles.fieldIcon} />
           <Text style={styles.readonlyText}>{formData.phone || '—'}</Text>
         </View>
-        <Text style={styles.hint}>Para cambiar el teléfono ve a la pestaña Personal.</Text>
+        <Text style={styles.hint}>{t('contact_phone_hint')}</Text>
       </View>
 
       {/* Rating */}
       {rating != null && (
         <View style={styles.field}>
-          <Text style={styles.label}>Tu calificación</Text>
+          <Text style={styles.label}>{t('contact_rating_label')}</Text>
           <View style={styles.ratingBox}>
             {[1, 2, 3, 4, 5].map(star => (
               <Icon
@@ -47,23 +48,21 @@ export default function ContactTab({ formData = { email: '', phone: '' }, rating
             ))}
             <Text style={styles.ratingNum}>{Number(rating).toFixed(1)}</Text>
           </View>
-          <Text style={styles.hint}>
-            Calculada automáticamente a partir de los viajes completados.
-          </Text>
+          <Text style={styles.hint}>{t('contact_rating_hint')}</Text>
         </View>
       )}
 
       {/* Info box */}
       <View style={styles.infoBox}>
-        <Text style={styles.infoTitle}>Seguridad de tu cuenta</Text>
+        <Text style={styles.infoTitle}>{t('contact_security')}</Text>
         <Text style={styles.infoText}>
-          <Icon name="checkmark-circle" size={13} color="#007AFF" /> Autenticación via Firebase
+          <Icon name="checkmark-circle" size={13} color="#007AFF" />{t('contact_sec_firebase')}
         </Text>
         <Text style={styles.infoText}>
-          <Icon name="checkmark-circle" size={13} color="#007AFF" /> Contraseña cifrada
+          <Icon name="checkmark-circle" size={13} color="#007AFF" />{t('contact_sec_password')}
         </Text>
         <Text style={styles.infoText}>
-          <Icon name="checkmark-circle" size={13} color="#007AFF" /> Token renovado automáticamente
+          <Icon name="checkmark-circle" size={13} color="#007AFF" />{t('contact_sec_token')}
         </Text>
       </View>
     </View>

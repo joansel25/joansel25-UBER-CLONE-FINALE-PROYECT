@@ -61,21 +61,20 @@ export function AuthProvider({ children }) {
               logger.info('Auth', 'No Firestore profile → complete registration');
               setDbUser(null);
               setProfileStatus('not_found');
-              await AsyncStorage.removeItem(USER_KEY);
+              try { await AsyncStorage.removeItem(USER_KEY); } catch { /* ignore */ }
             }
           } else {
             logger.error('Auth', `Error loading profile: ${err.message}`);
-            // Unexpected error → clear cache and prompt user to register
             setDbUser(null);
             setProfileStatus('not_found');
-            await AsyncStorage.removeItem(USER_KEY);
+            try { await AsyncStorage.removeItem(USER_KEY); } catch { /* ignore */ }
           }
         }
       } else {
         logger.info('Auth', 'No Firebase session — clearing state');
         setDbUser(null);
         setProfileStatus('loading');
-        await AsyncStorage.removeItem(USER_KEY);
+        try { await AsyncStorage.removeItem(USER_KEY); } catch { /* ignore */ }
       }
 
       setLoading(false);
@@ -92,7 +91,7 @@ export function AuthProvider({ children }) {
   const signOut = async () => {
     logger.info('Auth', 'signOut');
     await firebaseSignOut(getAuth());
-    await AsyncStorage.removeItem(USER_KEY);
+    try { await AsyncStorage.removeItem(USER_KEY); } catch { /* ignore */ }
     setDbUser(null);
     setProfileStatus('loading');
   };

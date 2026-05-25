@@ -7,12 +7,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon        from 'react-native-vector-icons/Ionicons';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from '../../hooks/useTranslation';
 import ErrorBanner from '../../components/common/ErrorBanner';
 import logger      from '../../utils/logger';
 import { COLORS, SPACING, RADIUS, FONT, SHADOW } from '../../constants/theme';
 
 export default function LoginScreen({ navigation }) {
   const { signIn, resetPassword } = useAuth();
+  const { t } = useTranslation();
 
   const [email,       setEmail]       = useState('');
   const [password,    setPassword]    = useState('');
@@ -30,11 +32,11 @@ export default function LoginScreen({ navigation }) {
     setDebugCode('');
 
     if (!email.trim()) {
-      setError('Ingresa tu correo electrónico para continuar.');
+      setError(t('login_no_email'));
       return;
     }
     if (!password) {
-      setError('Ingresa tu contraseña para continuar.');
+      setError(t('login_no_pass'));
       return;
     }
 
@@ -48,7 +50,7 @@ export default function LoginScreen({ navigation }) {
     } catch (err) {
       logger.error('Login', `Failed — code:${err.code} | message:${err.message}`);
       setDebugCode(err.code ?? 'no_code');
-      setError(friendlyMessage(err.code));
+      setError(friendlyMessage(err.code, t));
     } finally {
       setLoading(false);
     }
@@ -57,7 +59,7 @@ export default function LoginScreen({ navigation }) {
   const handleForgotPassword = async () => {
     const emailToReset = email.trim().toLowerCase();
     if (!emailToReset) {
-      setError('Escribe tu correo primero, luego toca "Olvidé mi contraseña".');
+      setError(t('login_write_email'));
       return;
     }
 
@@ -67,16 +69,16 @@ export default function LoginScreen({ navigation }) {
       await resetPassword(emailToReset);
       logger.ok('Login', 'Email de reset enviado');
       Alert.alert(
-        'Correo enviado',
-        `Te enviamos un enlace para restablecer tu contraseña a ${emailToReset}. Revisa tu bandeja de entrada.`,
-        [{ text: 'Entendido', style: 'default' }]
+        t('login_reset_title'),
+        t('login_reset_msg', emailToReset),
+        [{ text: t('login_reset_btn'), style: 'default' }]
       );
     } catch (err) {
       logger.error('Login', `Reset failed — code:${err.code} | ${err.message}`);
       if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-email') {
-        setError('No existe ninguna cuenta con ese correo.');
+        setError(t('login_no_account'));
       } else {
-        setError('No se pudo enviar el correo. Verifica tu conexión e inténtalo de nuevo.');
+        setError(t('login_reset_fail'));
       }
     } finally {
       setResetting(false);
@@ -101,8 +103,8 @@ export default function LoginScreen({ navigation }) {
             <View style={styles.logoCircle}>
               <Icon name="car-sport" size={36} color={COLORS.white} />
             </View>
-            <Text style={styles.title}>Bienvenido</Text>
-            <Text style={styles.subtitle}>Inicia sesión para continuar</Text>
+            <Text style={styles.title}>{t('login_title')}</Text>
+            <Text style={styles.subtitle}>{t('login_subtitle')}</Text>
           </View>
 
           {/* ── Form card ── */}
@@ -120,12 +122,12 @@ export default function LoginScreen({ navigation }) {
 
             {/* Email */}
             <View style={styles.field}>
-              <Text style={styles.label}>Correo electrónico</Text>
+              <Text style={styles.label}>{t('login_email_label')}</Text>
               <View style={styles.inputRow}>
                 <Icon name="mail-outline" size={18} color={COLORS.gray} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="ejemplo@correo.com"
+                  placeholder={t('login_email_ph')}
                   placeholderTextColor={COLORS.gray}
                   value={email}
                   onChangeText={handleEmailChange}
@@ -139,7 +141,7 @@ export default function LoginScreen({ navigation }) {
 
             {/* Password */}
             <View style={styles.field}>
-              <Text style={styles.label}>Contraseña</Text>
+              <Text style={styles.label}>{t('login_pass_label')}</Text>
               <View style={styles.inputRow}>
                 <Icon name="lock-closed-outline" size={18} color={COLORS.gray} style={styles.inputIcon} />
                 <TextInput
@@ -173,7 +175,7 @@ export default function LoginScreen({ navigation }) {
             >
               {resetting
                 ? <ActivityIndicator size="small" color={COLORS.primary} />
-                : <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
+                : <Text style={styles.forgotText}>{t('login_forgot')}</Text>
               }
             </TouchableOpacity>
 
@@ -188,7 +190,7 @@ export default function LoginScreen({ navigation }) {
                 ? <ActivityIndicator color={COLORS.white} size="small" />
                 : <>
                     <Icon name="log-in-outline" size={18} color={COLORS.white} />
-                    <Text style={styles.primaryBtnText}>Iniciar sesión</Text>
+                    <Text style={styles.primaryBtnText}>{t('login_btn')}</Text>
                   </>
               }
             </TouchableOpacity>
@@ -208,14 +210,12 @@ export default function LoginScreen({ navigation }) {
               activeOpacity={0.85}
             >
               <Icon name="person-add-outline" size={18} color={COLORS.primary} />
-              <Text style={styles.secondaryBtnText}>Crear cuenta nueva</Text>
+              <Text style={styles.secondaryBtnText}>{t('login_create')}</Text>
             </TouchableOpacity>
 
           </View>
 
-          <Text style={styles.footer}>
-            Al continuar aceptas nuestros Términos de Uso y Política de Privacidad.
-          </Text>
+          <Text style={styles.footer}>{t('login_footer')}</Text>
 
         </ScrollView>
       </KeyboardAvoidingView>
@@ -223,30 +223,17 @@ export default function LoginScreen({ navigation }) {
   );
 }
 
-function friendlyMessage(code) {
+function friendlyMessage(code, t) {
   const map = {
-    'auth/user-not-found':
-      'No encontramos ninguna cuenta con ese correo. ¿Quieres crear una?',
-    'auth/wrong-password':
-      'La contraseña es incorrecta. Verifica e intenta de nuevo.',
-    'auth/invalid-email':
-      'El formato del correo no es válido. Ejemplo: usuario@correo.com',
-    'auth/invalid-credential':
-      'El correo o la contraseña no coinciden. Verifica tus datos o usa "¿Olvidaste tu contraseña?"',
-    'auth/too-many-requests':
-      'Tu cuenta fue bloqueada temporalmente. Usa "¿Olvidaste tu contraseña?" para restablecerla o espera unos minutos.',
-    'auth/user-disabled':
-      'Esta cuenta ha sido desactivada. Comunícate con soporte.',
-    'auth/network-request-failed':
-      'No se pudo conectar con el servidor de autenticación. Verifica tu conexión.',
-    'auth/configuration-not':
-      'El servicio de autenticación no está disponible en este momento.',
-    'auth/internal-error':
-      'Ocurrió un problema interno. Por favor intenta de nuevo en unos segundos.',
-    'auth/operation-not-allowed':
-      'Este método de inicio de sesión no está habilitado. Contacta al administrador.',
+    'auth/user-not-found':        t('login_err_not_found'),
+    'auth/wrong-password':        t('login_err_wrong_pass'),
+    'auth/invalid-email':         t('login_err_invalid_email'),
+    'auth/invalid-credential':    t('login_err_invalid_cred'),
+    'auth/too-many-requests':     t('login_err_too_many'),
+    'auth/user-disabled':         t('login_err_disabled'),
+    'auth/network-request-failed':t('login_err_network'),
   };
-  return map[code] ?? 'Algo salió mal. Por favor intenta de nuevo.';
+  return map[code] ?? t('login_err_default');
 }
 
 const styles = StyleSheet.create({

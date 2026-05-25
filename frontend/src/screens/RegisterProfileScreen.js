@@ -10,16 +10,18 @@ import PersonalInfoTab from './tabs/PersonalInfoTab';
 import ContactTab      from './tabs/ContactTab';
 import PreferencesTab  from './tabs/PreferencesTab';
 import { useAuth }     from '../context/AuthContext';
+import { useTranslation } from '../hooks/useTranslation';
 import userApi         from '../api/userApi';
 
 const TABS = [
-  { id: 'personal',     label: 'Personal', icon: 'person' },
-  { id: 'contact',      label: 'Contacto', icon: 'mail' },
-  { id: 'preferences',  label: 'Ajustes',  icon: 'settings' },
+  { id: 'personal',    labelKey: 'profile_tab_personal', icon: 'person' },
+  { id: 'contact',     labelKey: 'profile_tab_contact',  icon: 'mail' },
+  { id: 'preferences', labelKey: 'profile_tab_prefs',    icon: 'settings' },
 ];
 
 export default function RegisterProfileScreen({ navigation }) {
   const { dbUser, signOut, refreshUser } = useAuth();
+  const { t } = useTranslation();
 
   const [activeTab, setActiveTab] = useState('personal');
   const [isSaving,  setIsSaving]  = useState(false);
@@ -57,18 +59,18 @@ export default function RegisterProfileScreen({ navigation }) {
     try {
       await userApi.updateProfile(updates);
       await refreshUser();
-      Alert.alert('Listo', 'Perfil actualizado correctamente.');
+      Alert.alert('', t('profile_saved_ok'));
     } catch (error) {
-      Alert.alert('Error', error.message || 'No se pudo guardar. Intenta de nuevo.');
+      Alert.alert('Error', t('profile_save_error', error.message));
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleLogout = () =>
-    Alert.alert('Cerrar sesión', '¿Deseas cerrar tu sesión?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Salir', style: 'destructive', onPress: signOut },
+    Alert.alert(t('profile_logout_title'), t('profile_logout_msg'), [
+      { text: t('profile_logout_cancel'), style: 'cancel' },
+      { text: t('profile_logout_btn'), style: 'destructive', onPress: () => { signOut().catch(() => {}); } },
     ]);
 
   return (
@@ -78,13 +80,13 @@ export default function RegisterProfileScreen({ navigation }) {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <View>
-            <Text style={styles.headerTitle}>Mi Perfil</Text>
+            <Text style={styles.headerTitle}>{t('profile_title')}</Text>
             {dbUser?.rating != null && (
               <View style={styles.ratingRow}>
                 <Icon name="star" size={14} color="#FF9500" />
                 <Text style={styles.ratingText}>{Number(dbUser.rating).toFixed(1)}</Text>
                 <Text style={styles.ratingRole}>
-                  · {dbUser.role === 'driver' ? 'Conductor' : 'Pasajero'}
+                  · {dbUser.role === 'driver' ? t('profile_role_driver') : t('profile_role_passenger')}
                 </Text>
               </View>
             )}
@@ -93,7 +95,7 @@ export default function RegisterProfileScreen({ navigation }) {
             <Icon name="log-out-outline" size={22} color="#FF3B30" />
           </TouchableOpacity>
         </View>
-        <Text style={styles.headerSubtitle}>Los campos con * son obligatorios</Text>
+        <Text style={styles.headerSubtitle}>{t('profile_required')}</Text>
 
         {/* Quick-action rows — passengers only */}
         {dbUser?.role !== 'driver' && (
@@ -103,7 +105,7 @@ export default function RegisterProfileScreen({ navigation }) {
               onPress={() => navigation.navigate('PaymentMethods')}
             >
               <Icon name="card-outline" size={18} color="#007AFF" />
-              <Text style={styles.walletText}>Métodos de pago</Text>
+              <Text style={styles.walletText}>{t('profile_payment')}</Text>
               <Icon name="chevron-forward" size={16} color="#666" style={{ marginLeft: 'auto' }} />
             </TouchableOpacity>
 
@@ -112,7 +114,7 @@ export default function RegisterProfileScreen({ navigation }) {
               onPress={() => navigation.navigate('PaymentHistory')}
             >
               <Icon name="receipt-outline" size={18} color="#007AFF" />
-              <Text style={styles.walletText}>Historial de pagos</Text>
+              <Text style={styles.walletText}>{t('profile_pay_history')}</Text>
               <Icon name="chevron-forward" size={16} color="#666" style={{ marginLeft: 'auto' }} />
             </TouchableOpacity>
 
@@ -121,7 +123,7 @@ export default function RegisterProfileScreen({ navigation }) {
               onPress={() => navigation.navigate('DriverRegister')}
             >
               <Icon name="car-sport-outline" size={18} color="#34C759" />
-              <Text style={[styles.walletText, { color: '#34C759' }]}>Conviértete en conductor</Text>
+              <Text style={[styles.walletText, { color: '#34C759' }]}>{t('profile_become_driver')}</Text>
               <Icon name="chevron-forward" size={16} color="#666" style={{ marginLeft: 'auto' }} />
             </TouchableOpacity>
           </>
@@ -129,7 +131,7 @@ export default function RegisterProfileScreen({ navigation }) {
         {isSaving && (
           <View style={styles.savingRow}>
             <ActivityIndicator size="small" color="#007AFF" />
-            <Text style={styles.savingText}>Guardando…</Text>
+            <Text style={styles.savingText}>{t('profile_saving')}</Text>
           </View>
         )}
       </View>
@@ -149,7 +151,7 @@ export default function RegisterProfileScreen({ navigation }) {
                 color={activeTab === tab.id ? '#007AFF' : '#666'}
               />
               <Text style={[styles.tabLabel, activeTab === tab.id && styles.tabLabelActive]}>
-                {tab.label}
+                {t(tab.labelKey)}
               </Text>
             </TouchableOpacity>
           ))}
