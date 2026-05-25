@@ -7,15 +7,21 @@ import RegisterScreen from '../src/screens/auth/RegisterScreen';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-const mockRefreshUser = jest.fn();
-const mockRegister    = jest.fn();
-const mockCreateUser  = jest.fn();
+const mockRefreshUser      = jest.fn();
+const mockForceUserFound   = jest.fn();
+const mockSetIsRegistering = jest.fn();
+const mockSignIn           = jest.fn().mockRejectedValue({ code: 'auth/wrong-password' });
+const mockRegister         = jest.fn();
+const mockCreateUser       = jest.fn();
 
 jest.mock('../src/context/AuthContext', () => ({
   useAuth: () => ({
-    refreshUser:  mockRefreshUser,
-    signOut:      jest.fn(),
-    firebaseUser: null,
+    refreshUser:      mockRefreshUser,
+    forceUserFound:   mockForceUserFound,
+    setIsRegistering: mockSetIsRegistering,
+    signIn:           mockSignIn,
+    signOut:          jest.fn(),
+    firebaseUser:     null,
   }),
 }));
 
@@ -89,6 +95,9 @@ describe('RegisterScreen — registro de usuario', () => {
     mockCreateUser.mockClear();
     mockRegister.mockClear();
     mockRefreshUser.mockClear();
+    mockForceUserFound.mockClear();
+    mockSetIsRegistering.mockClear();
+    mockSignIn.mockClear();
     mockNavigation.navigate.mockClear();
   });
 
@@ -204,7 +213,7 @@ describe('RegisterScreen — registro de usuario', () => {
           role:        'passenger',
         }),
       );
-      expect(mockRefreshUser).toHaveBeenCalled();
+      expect(mockForceUserFound).toHaveBeenCalled();
     });
   });
 
