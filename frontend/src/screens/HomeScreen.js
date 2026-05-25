@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList,
   StyleSheet, Alert, ActivityIndicator, Platform,
@@ -19,6 +19,8 @@ import VehicleSelector from '../components/trip/VehicleSelector';
 import { formatCOP }   from '../utils/formatters';
 import { COLORS, RADIUS, FONT, SPACING, SHADOW } from '../constants/theme';
 import { useTranslation } from '../hooks/useTranslation';
+import driverApi from '../api/driverApi';
+import { seedSimulatedDrivers } from '../utils/seedDrivers';
 
 const MAX_FARE       = 50000;
 const DEBOUNCE_MS    = 400;
@@ -31,6 +33,18 @@ const STEP = {
   READY:      'ready',
   REQUESTING: 'requesting',
 };
+
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R    = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.asin(Math.sqrt(a));
+}
 
 export default function HomeScreen({ navigation }) {
   const dispatch     = useDispatch();
@@ -54,6 +68,26 @@ export default function HomeScreen({ navigation }) {
   const [selectedCategory, setSelectedCategory] = useState('economy');
   const [mapRegion,        setMapRegion]        = useState(DEFAULT_REGION);
   const [gettingGPS,       setGettingGPS]       = useState(false);
+  const [nearbyDrivers,    setNearbyDrivers]    = useState([]);
+
+  // ── Load nearby drivers; auto-seed simulated ones if none exist ─────────────
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await driverApi.getNearby();
+        if (cancelled) return;
+        if (data.length === 0) {
+          await seedSimulatedDrivers();
+          const { data: seeded } = await driverApi.getNearby();
+          if (!cancelled) setNearbyDrivers(seeded);
+        } else {
+          setNearbyDrivers(data);
+        }
+      } catch { /* map still works without drivers */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // ── Set origin from GPS on first fix ────────────────────────────────────────
   useEffect(() => {
@@ -131,6 +165,21 @@ export default function HomeScreen({ navigation }) {
       setStep(STEP.IDLE);
     }
   }, [t]);
+
+  // ── Find nearest available driver to the origin point ───────────────────────
+  const { nearestDriver, nearestDistKm } = useMemo(() => {
+    const withLoc = nearbyDrivers.filter(d => d.currentLocation);
+    if (!withLoc.length) return { nearestDriver: null, nearestDistKm: null };
+    const ref = originPlace;
+    if (!ref) return { nearestDriver: withLoc[0], nearestDistKm: null };
+    let best = withLoc[0];
+    let bestDist = haversineKm(ref.lat, ref.lng, best.currentLocation.lat, best.currentLocation.lng);
+    for (const d of withLoc.slice(1)) {
+      const dist = haversineKm(ref.lat, ref.lng, d.currentLocation.lat, d.currentLocation.lng);
+      if (dist < bestDist) { best = d; bestDist = dist; }
+    }
+    return { nearestDriver: best, nearestDistKm: bestDist.toFixed(1) };
+  }, [originPlace, nearbyDrivers]);
 
   // ── Select autocomplete suggestion ───────────────────────────────────────────
   const handleSelectSuggestion = async (suggestion) => {
@@ -269,6 +318,28 @@ export default function HomeScreen({ navigation }) {
             pinColor={COLORS.danger}
           />
         )}
+        {/* Nearby driver markers */}
+        {nearbyDrivers.map(driver => {
+          if (!driver.currentLocation) return null;
+          const isNearest = nearestDriver?._id === driver._id;
+          return (
+            <Marker
+              key={driver._id}
+              coordinate={{ latitude: driver.currentLocation.lat, longitude: driver.currentLocation.lng }}
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={false}
+            >
+              <View style={[styles.driverMarker, isNearest && styles.driverMarkerNearest]}>
+                <Icon
+                  name="car"
+                  size={isNearest ? 16 : 13}
+                  color={isNearest ? COLORS.white : COLORS.primary}
+                />
+              </View>
+            </Marker>
+          );
+        })}
+
         {/* Route polyline when estimate is ready */}
         {estimate?.route?.polyline && (
           <Polyline
@@ -354,6 +425,26 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.greeting}>
             {t('home_greeting', dbUser?.fullName?.split(' ')[0] ?? t('home_traveler'))}
           </Text>
+
+          {/* Drivers available + nearest driver info */}
+          {nearbyDrivers.length > 0 && step === STEP.IDLE && (
+            <View style={styles.driversRow}>
+              <View style={styles.driversAvailableChip}>
+                <View style={styles.driversDot} />
+                <Text style={styles.driversAvailableText}>
+                  {t('home_drivers_available', nearbyDrivers.length)}
+                </Text>
+              </View>
+              {nearestDriver && nearestDistKm && (
+                <View style={styles.nearestDriverChip}>
+                  <Icon name="navigate" size={11} color={COLORS.primary} />
+                  <Text style={styles.nearestDriverText}>
+                    {t('home_nearest_driver')} · {t('home_driver_km_away', nearestDistKm)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
 
           {/* ── Origin input ── */}
           <View style={[styles.inputRow, activeField === 'origin' && styles.inputRowFocused]}>
@@ -603,4 +694,43 @@ const styles = StyleSheet.create({
   },
   requestBtnDisabled: { backgroundColor: '#A5D6A7' },
   requestBtnText:     { color: COLORS.white, fontSize: FONT.md, fontWeight: '700' },
+
+  // Driver markers on map
+  driverMarker: {
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: COLORS.white,
+    borderWidth: 2, borderColor: COLORS.primary,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 4, elevation: 4,
+  },
+  driverMarkerNearest: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+    width: 42, height: 42, borderRadius: 21,
+    shadowOpacity: 0.3,
+  },
+
+  // Drivers available chips in bottom panel
+  driversRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginBottom: SPACING.sm, flexWrap: 'wrap',
+  },
+  driversAvailableChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: '#F0FFF4', borderRadius: 20,
+    paddingVertical: 4, paddingHorizontal: 10,
+    borderWidth: 1, borderColor: '#A8E6CF',
+  },
+  driversDot: {
+    width: 7, height: 7, borderRadius: 4,
+    backgroundColor: COLORS.success,
+  },
+  driversAvailableText: { fontSize: 11, color: '#2d7a44', fontWeight: '600' },
+  nearestDriverChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#EEF5FF', borderRadius: 20,
+    paddingVertical: 4, paddingHorizontal: 10,
+    borderWidth: 1, borderColor: '#B8D4FF',
+  },
+  nearestDriverText: { fontSize: 11, color: COLORS.primary, fontWeight: '600' },
 });

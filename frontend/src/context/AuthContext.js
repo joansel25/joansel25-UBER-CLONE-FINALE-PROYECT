@@ -112,6 +112,11 @@ export function AuthProvider({ children }) {
     return data;
   };
 
+  // Merge a partial update into dbUser state immediately (no Firestore round-trip)
+  const updateDbUser = useCallback((partial) => {
+    setDbUser(prev => prev ? { ...prev, ...partial } : prev);
+  }, []);
+
   // Used after registration to set the profile directly without a second Firestore GET
   const forceUserFound = useCallback(async (userData) => {
     logger.ok('Auth', `forceUserFound — ${userData.email}`);
@@ -125,7 +130,7 @@ export function AuthProvider({ children }) {
       value={{
         firebaseUser, dbUser, loading, profileStatus,
         isRegistering, setIsRegistering,
-        signIn, signOut, resetPassword, refreshUser, forceUserFound,
+        signIn, signOut, resetPassword, refreshUser, forceUserFound, updateDbUser,
       }}
     >
       {children}

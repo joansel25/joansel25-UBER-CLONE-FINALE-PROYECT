@@ -24,6 +24,9 @@ const S = {
     home_gps_title:           'Ubicación',
     home_gps_unavailable:     'No se pudo determinar tu posición. Verifica que la ubicación esté activada en el dispositivo.',
     home_gps_timeout:         'No se pudo obtener tu ubicación. Asegúrate de tener señal o activa el WiFi.',
+    home_drivers_available:   n => `${n} conductor${n === 1 ? '' : 'es'} disponible${n === 1 ? '' : 's'} cerca`,
+    home_nearest_driver:      'Conductor más cercano',
+    home_driver_km_away:      km => `a ${km} km`,
 
     // ── LoginScreen ─────────────────────────────────────────────────────────
     login_title:           'Bienvenido',
@@ -287,6 +290,9 @@ const S = {
     home_gps_title:           'Location',
     home_gps_unavailable:     'Could not determine your position. Make sure location is enabled on your device.',
     home_gps_timeout:         'Could not get your location. Make sure you have a signal or enable WiFi.',
+    home_drivers_available:   n => `${n} driver${n === 1 ? '' : 's'} available nearby`,
+    home_nearest_driver:      'Nearest driver',
+    home_driver_km_away:      km => `${km} km away`,
 
     // ── LoginScreen ─────────────────────────────────────────────────────────
     login_title:           'Welcome',

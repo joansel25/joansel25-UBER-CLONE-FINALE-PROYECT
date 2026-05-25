@@ -20,7 +20,7 @@ const TABS = [
 ];
 
 export default function RegisterProfileScreen({ navigation }) {
-  const { dbUser, signOut, refreshUser } = useAuth();
+  const { dbUser, signOut, refreshUser, updateDbUser } = useAuth();
   const { t } = useTranslation();
 
   const [activeTab, setActiveTab] = useState('personal');
@@ -58,7 +58,8 @@ export default function RegisterProfileScreen({ navigation }) {
     setIsSaving(true);
     try {
       await userApi.updateProfile(updates);
-      await refreshUser();
+      updateDbUser(updates); // instant local state update — language/name changes take effect immediately
+      refreshUser().catch(() => {}); // background sync with Firestore (no await — don't block UI)
       Alert.alert('', t('profile_saved_ok'));
     } catch (error) {
       Alert.alert('Error', t('profile_save_error', error.message));
