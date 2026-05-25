@@ -96,6 +96,7 @@ export default function FollowTravelScreen({ route, navigation }) {
   // Simulation control refs
   const simAcceptedRef  = useRef(false);
   const simStartedRef   = useRef(false);
+  const simOngoingRef   = useRef(false);
   const simIntervalRef  = useRef(null);
 
   const { trip, driverLocation, loading, error } = useTripTracking(tripId);
@@ -179,7 +180,8 @@ export default function FollowTravelScreen({ route, navigation }) {
   // ── SIMULATION STEP 3: Animate driver along route during 'ongoing' ─────────
   useEffect(() => {
     if (!trip || trip.status !== 'ongoing' || !trip.polyline) return;
-    if (simIntervalRef.current) return;
+    if (simOngoingRef.current || simIntervalRef.current) return;
+    simOngoingRef.current = true;
 
     const coords = samplePolyline(trip.polyline, 40);
     if (coords.length === 0) {
@@ -234,15 +236,31 @@ export default function FollowTravelScreen({ route, navigation }) {
   }, [trip, driverLocation]);
 
   // ── Auto-fit map when driver location changes ──────────────────────────────
+  // accepted → show driver + origin so user sees driver approaching
+  // ongoing  → show driver + destination so user sees progress toward goal
   useEffect(() => {
-    if (!driverLocation || !mapRef.current) return;
-    mapRef.current.animateToRegion({
-      latitude:      driverLocation.latitude,
-      longitude:     driverLocation.longitude,
-      latitudeDelta:  0.015,
-      longitudeDelta: 0.015,
-    }, 800);
-  }, [driverLocation]);
+    if (!driverLocation || !mapRef.current || !trip) return;
+
+    const anchor = trip.status === 'accepted' && trip.origin?.lat
+      ? { latitude: trip.origin.lat, longitude: trip.origin.lng }
+      : trip.status === 'ongoing' && trip.destination?.lat
+        ? { latitude: trip.destination.lat, longitude: trip.destination.lng }
+        : null;
+
+    if (anchor) {
+      mapRef.current.fitToCoordinates(
+        [driverLocation, anchor],
+        { edgePadding: { top: 80, right: 60, bottom: 320, left: 60 }, animated: true },
+      );
+    } else {
+      mapRef.current.animateToRegion({
+        latitude:      driverLocation.latitude,
+        longitude:     driverLocation.longitude,
+        latitudeDelta:  0.015,
+        longitudeDelta: 0.015,
+      }, 800);
+    }
+  }, [driverLocation, trip?.status]);
 
   // ── Load saved cards when trip completes ───────────────────────────────────
   useEffect(() => {
@@ -415,15 +433,18 @@ export default function FollowTravelScreen({ route, navigation }) {
             </Marker>
           )}
 
-          {/* Driver marker (animated via Realtime DB updates) */}
+          {/* Driver marker — animated via Realtime DB, moves in real time */}
           {driverLocation && (
             <Marker
               coordinate={driverLocation}
               title={driver?.fullName ?? 'Conductor'}
               anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={false}
             >
-              <View style={styles.markerDriver}>
-                <Icon name="car" size={18} color={COLORS.white} />
+              <View style={styles.markerDriverOuter}>
+                <View style={styles.markerDriver}>
+                  <Icon name="car-sport" size={20} color={COLORS.white} />
+                </View>
               </View>
             </Marker>
           )}
@@ -440,9 +461,19 @@ export default function FollowTravelScreen({ route, navigation }) {
               ? <ActivityIndicator size="small" color={COLORS.primary} style={{ marginRight: 8 }} />
               : <Icon name={statusIcon(status)} size={22} color={statusColor(status)} style={{ marginRight: 8 }} />
             }
-            <Text style={[styles.statusText, { color: statusColor(status) }]}>
-              {statusLabel(status)}
-            </Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.statusText, { color: statusColor(status) }]}>
+                {statusLabel(status)}
+              </Text>
+              {status === 'accepted' && (
+                <Text style={styles.statusSub}>El conductor se dirige a recogerte</Text>
+              )}
+              {status === 'ongoing' && (
+                <Text style={styles.statusSub}>
+                  {trip?.destination?.address ? `Hacia: ${trip.destination.address}` : 'En camino al destino'}
+                </Text>
+              )}
+            </View>
           </View>
 
           {/* Driver card — visible once accepted/ongoing */}
@@ -623,6 +654,7 @@ const styles = StyleSheet.create({
 
   statusRow:  { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm },
   statusText: { fontSize: FONT.lg, fontWeight: '800' },
+  statusSub:  { fontSize: FONT.sm, color: COLORS.gray, marginTop: 2, numberOfLines: 1 },
 
   driverCard: {
     flexDirection: 'row', alignItems: 'center',
@@ -689,10 +721,13 @@ const styles = StyleSheet.create({
     width: 32, height: 32, borderRadius: 16,
     backgroundColor: COLORS.danger, alignItems: 'center', justifyContent: 'center',
   },
+  markerDriverOuter: {
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 6, elevation: 8,
+  },
   markerDriver: {
-    width: 38, height: 38, borderRadius: 19,
+    width: 44, height: 44, borderRadius: 22,
     backgroundColor: '#1C1C1E', alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: COLORS.white,
-    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 4, elevation: 6,
+    borderWidth: 2.5, borderColor: COLORS.white,
   },
 });

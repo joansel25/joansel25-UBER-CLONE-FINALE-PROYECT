@@ -5,6 +5,7 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import Geolocation from '@react-native-community/geolocation';
 import decodePolyline from '../utils/decodePolyline';
 import Icon from 'react-native-vector-icons/Ionicons';
 
@@ -50,6 +51,7 @@ export default function HomeScreen({ navigation }) {
   const [estimate,         setEstimate]         = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('economy');
   const [mapRegion,        setMapRegion]        = useState(DEFAULT_REGION);
+  const [gettingGPS,       setGettingGPS]       = useState(false);
 
   // ── Set origin from GPS on first fix ────────────────────────────────────────
   useEffect(() => {
@@ -276,36 +278,47 @@ export default function HomeScreen({ navigation }) {
         )}
       </MapView>
 
-      {/* ── My location button ── */}
+      {/* ── My location button (native GPS fresh fix) ── */}
       <TouchableOpacity
         style={styles.myLocationBtn}
+        disabled={gettingGPS}
         onPress={() => {
-          if (!location) return;
-          const gpsPlace = {
-            address: 'Mi ubicación actual',
-            lat:     location.latitude,
-            lng:     location.longitude,
-          };
-          // Update origin input and place
-          setOriginPlace(gpsPlace);
-          setOriginText('Mi ubicación actual');
-          setActiveField(null);
-          setSuggestions([]);
-          dispatch(setOrigin(gpsPlace));
-          // Animate map to current location
-          mapRef.current?.animateToRegion({
-            latitude:      location.latitude,
-            longitude:     location.longitude,
-            latitudeDelta:  0.01,
-            longitudeDelta: 0.01,
-          }, 400);
-          // If destination already set, recalculate estimate
-          if (destPlace && step !== STEP.REQUESTING) {
-            calculateEstimate(gpsPlace, destPlace);
-          }
+          setGettingGPS(true);
+          Geolocation.getCurrentPosition(
+            ({ coords }) => {
+              setGettingGPS(false);
+              const gpsPlace = {
+                address: 'Mi ubicación actual',
+                lat:     coords.latitude,
+                lng:     coords.longitude,
+              };
+              setOriginPlace(gpsPlace);
+              setOriginText('Mi ubicación actual');
+              setActiveField(null);
+              setSuggestions([]);
+              dispatch(setOrigin(gpsPlace));
+              mapRef.current?.animateToRegion({
+                latitude:      coords.latitude,
+                longitude:     coords.longitude,
+                latitudeDelta:  0.01,
+                longitudeDelta: 0.01,
+              }, 400);
+              if (destPlace && step !== STEP.REQUESTING) {
+                calculateEstimate(gpsPlace, destPlace);
+              }
+            },
+            () => {
+              setGettingGPS(false);
+              Alert.alert('Ubicación', 'No se pudo obtener tu ubicación. Verifica que los permisos de ubicación estén activados.');
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 },
+          );
         }}
       >
-        <Icon name="locate" size={22} color={COLORS.primary} />
+        {gettingGPS
+          ? <ActivityIndicator size="small" color={COLORS.primary} />
+          : <Icon name="locate" size={22} color={COLORS.primary} />
+        }
       </TouchableOpacity>
 
       {/* ── Bottom panel ── */}
