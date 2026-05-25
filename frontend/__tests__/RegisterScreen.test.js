@@ -241,7 +241,7 @@ describe('RegisterScreen — registro de usuario', () => {
     pressSubmit(q);
 
     const banner = await q.findByTestId('error-banner');
-    expect(banner.props.children).toContain('débil');
+    expect(banner.props.children).toContain('6 caracteres');
   });
 
   // ── Navegación ──────────────────────────────────────────────────────────────
