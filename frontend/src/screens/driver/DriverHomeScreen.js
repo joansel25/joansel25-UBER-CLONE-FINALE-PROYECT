@@ -87,7 +87,7 @@ export default function DriverHomeScreen() {
       () => broadcastLocation(tripId),
       LOCATION_INTERVAL,
     );
-  }, [broadcastLocation]);
+  }, [broadcastLocation, stopLocationBroadcast]);
 
   const stopLocationBroadcast = useCallback(() => {
     clearInterval(locationWatchRef.current);

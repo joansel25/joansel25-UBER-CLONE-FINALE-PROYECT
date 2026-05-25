@@ -99,17 +99,24 @@ const tripApi = {
     return { data: { trip: docToTrip(doc) } };
   },
 
-  // ── Historial del usuario (pasajero o conductor) ─────────────────────────
+  // ── Trip history (passenger or driver) ────────────────────────────────────
+  // orderBy removed: array-contains + orderBy requires a Firestore composite index.
+  // Sort is done client-side to avoid needing manual index creation.
   getHistory: async ({ page = 1, limit = 10 } = {}) => {
     const uid = getAuth().currentUser?.uid;
     if (!uid) return { trips: [], total: 0, page: 1, pages: 0 };
 
     const snap = await tripsCol()
       .where('participants', 'array-contains', uid)
-      .orderBy('createdAt', 'desc')
       .get();
 
-    const all   = snap.docs.map(docToTrip);
+    const all = snap.docs
+      .map(docToTrip)
+      .sort((a, b) => {
+        const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return tb - ta;
+      });
     const total = all.length;
     const start = (page - 1) * limit;
 
@@ -121,7 +128,7 @@ const tripApi = {
     };
   },
 
-  // ── Viajes disponibles (estado 'requested') ───────────────────────────────
+  // ── Available trips (status 'requested') ─────────────────────────────────
   getAvailable: async ({ page = 1, limit = 10 } = {}) => {
     const snap = await tripsCol()
       .where('status', '==', 'requested')

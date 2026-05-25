@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
+import { Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 
 const ICONS = {
@@ -27,7 +27,8 @@ export default function ErrorBanner({ message, type = 'error', onDismiss }) {
         Animated.timing(opacityAnim, { toValue: 0,   duration: 150, useNativeDriver: true }),
       ]).start();
     }
-  }, [message]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [message, slideAnim, opacityAnim]);
 
   if (!message) return null;
 

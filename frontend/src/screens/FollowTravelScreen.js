@@ -145,6 +145,7 @@ export default function FollowTravelScreen({ route, navigation }) {
     }, 2000);
 
     return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trip?.status, tripId]);
 
   // ── SIMULATION STEP 2: Driver approaches pickup (accepted → ongoing) ─────────
@@ -270,7 +271,7 @@ export default function FollowTravelScreen({ route, navigation }) {
         longitudeDelta: 0.015,
       }, 800);
     }
-  }, [driverLocation, trip?.status]);
+  }, [driverLocation, trip?.status, trip]);
 
   // ── Load saved cards when trip completes ───────────────────────────────────
   useEffect(() => {

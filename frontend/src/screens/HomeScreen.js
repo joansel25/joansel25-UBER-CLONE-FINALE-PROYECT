@@ -70,7 +70,7 @@ export default function HomeScreen({ navigation }) {
         longitudeDelta: 0.01,
       });
     }
-  }, [location]);
+  }, [location, originPlace]);
 
   // ── Debounced Places autocomplete ────────────────────────────────────────────
   const handleSearchChange = useCallback((text, field) => {
