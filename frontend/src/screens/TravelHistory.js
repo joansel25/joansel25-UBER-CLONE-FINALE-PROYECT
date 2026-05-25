@@ -54,7 +54,7 @@ export default function TravelHistory({ navigation }) {
       setRefreshing(false);
       setLoadingMore(false);
     }
-  }, []);
+  }, [t]);
 
   useFocusEffect(
     useCallback(() => {

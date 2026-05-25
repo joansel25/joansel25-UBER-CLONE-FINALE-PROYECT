@@ -44,7 +44,7 @@ export default function PaymentHistory({ navigation }) {
       setRefreshing(false);
       setLoadingMore(false);
     }
-  }, []);
+  }, [t]);
 
   useFocusEffect(
     useCallback(() => {

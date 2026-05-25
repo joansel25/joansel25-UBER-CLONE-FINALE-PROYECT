@@ -41,7 +41,7 @@ export default function PaymentMethodsScreen({ navigation }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   // Reload every time the screen comes into focus
   useFocusEffect(loadCards);

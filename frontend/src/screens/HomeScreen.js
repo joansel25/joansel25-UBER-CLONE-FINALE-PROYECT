@@ -72,7 +72,7 @@ export default function HomeScreen({ navigation }) {
         longitudeDelta: 0.01,
       });
     }
-  }, [location, originPlace]);
+  }, [location, originPlace, t]);
 
   // ── Debounced Places autocomplete ────────────────────────────────────────────
   const handleSearchChange = useCallback((text, field) => {
@@ -130,7 +130,7 @@ export default function HomeScreen({ navigation }) {
       Alert.alert(t('home_route_error'), t('home_route_error_msg', error.message));
       setStep(STEP.IDLE);
     }
-  }, []);
+  }, [t]);
 
   // ── Select autocomplete suggestion ───────────────────────────────────────────
   const handleSelectSuggestion = async (suggestion) => {

@@ -62,11 +62,11 @@ export default function TripDetailScreen({ route, navigation }) {
         const [tripRes] = await Promise.all([
           tripApi.getById(tripId),
         ]);
-        const t = tripRes.data;
-        setTrip(t);
+        const tripData = tripRes.data;
+        setTrip(tripData);
 
         // Fetch transaction if trip was paid by card
-        if (t.paymentMethod === 'card' && t.status === 'completed') {
+        if (tripData.paymentMethod === 'card' && tripData.status === 'completed') {
           paymentApi.getByTrip(tripId)
             .then(r => setTx(r.data))
             .catch(() => {});
@@ -77,7 +77,7 @@ export default function TripDetailScreen({ route, navigation }) {
         setLoading(false);
       }
     })();
-  }, [tripId]);
+  }, [tripId, t]);
 
   if (loading) {
     return (

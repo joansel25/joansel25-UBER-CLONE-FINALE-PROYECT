@@ -64,7 +64,7 @@ export default function DriverHomeScreen() {
         setLoadingInit(false);
       }
     })();
-  }, []);
+  }, [t]);
 
   // ── Location broadcasting ───────────────────────────────────────────────
 
