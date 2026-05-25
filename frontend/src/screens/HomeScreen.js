@@ -4,7 +4,8 @@ import {
   StyleSheet, Alert, ActivityIndicator, Platform,
   KeyboardAvoidingView,
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import decodePolyline from '../utils/decodePolyline';
 import Icon from 'react-native-vector-icons/Ionicons';
 
 import { useDispatch }  from 'react-redux';
@@ -14,65 +15,76 @@ import useLocation     from '../hooks/useLocation';
 import placesApi       from '../api/placesApi';
 import tripApi         from '../api/tripApi';
 import VehicleSelector from '../components/trip/VehicleSelector';
-import { formatCOP, formatDistance, formatDuration } from '../utils/formatters';
+import { formatCOP }   from '../utils/formatters';
 import { COLORS, RADIUS, FONT, SPACING, SHADOW } from '../constants/theme';
 
 const MAX_FARE       = 50000;
 const DEBOUNCE_MS    = 400;
 const DEFAULT_REGION = { latitude: 4.7110, longitude: -74.0721, latitudeDelta: 0.05, longitudeDelta: 0.05 };
 
-// Steps: idle → searching → estimating → ready → requesting
-const STEP = { IDLE: 'idle', SEARCHING: 'searching', ESTIMATING: 'estimating', READY: 'ready', REQUESTING: 'requesting' };
+const STEP = {
+  IDLE:       'idle',
+  SEARCHING:  'searching',
+  ESTIMATING: 'estimating',
+  READY:      'ready',
+  REQUESTING: 'requesting',
+};
 
 export default function HomeScreen({ navigation }) {
-  const dispatch       = useDispatch();
-  const { dbUser }     = useAuth();
-  const { location }   = useLocation();
+  const dispatch     = useDispatch();
+  const { dbUser }   = useAuth();
+  const { location } = useLocation();
 
-  const mapRef        = useRef(null);
-  const debounceTimer = useRef(null);
-  const sessionToken  = useRef(String(Date.now()));
+  const mapRef       = useRef(null);
+  const debounceRef  = useRef(null);
+  const sessionToken = useRef(String(Date.now()));
+  const destInputRef = useRef(null);
 
   const [step,             setStep]             = useState(STEP.IDLE);
-  const [searchText,       setSearchText]       = useState('');
+  const [activeField,      setActiveField]      = useState(null); // 'origin' | 'destination'
+  const [originText,       setOriginText]       = useState('');
+  const [destText,         setDestText]         = useState('');
   const [suggestions,      setSuggestions]      = useState([]);
   const [originPlace,      setOriginPlace]      = useState(null);
   const [destPlace,        setDestPlace]        = useState(null);
-  const [estimate,         setEstimate]         = useState(null);  // { fares, route }
+  const [estimate,         setEstimate]         = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('economy');
   const [mapRegion,        setMapRegion]        = useState(DEFAULT_REGION);
 
-  // ── Center map when GPS resolves ────────────────────────────────────────────
+  // ── Set origin from GPS on first fix ────────────────────────────────────────
   useEffect(() => {
-    if (location && step === STEP.IDLE) {
-      const region = {
-        latitude:      location.latitude,
-        longitude:     location.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      };
-      setMapRegion(region);
-      setOriginPlace({
+    if (location && !originPlace) {
+      const gpsPlace = {
         address: 'Mi ubicación actual',
         lat:     location.latitude,
         lng:     location.longitude,
+      };
+      setOriginPlace(gpsPlace);
+      setOriginText('Mi ubicación actual');
+      setMapRegion({
+        latitude:      location.latitude,
+        longitude:     location.longitude,
+        latitudeDelta:  0.01,
+        longitudeDelta: 0.01,
       });
     }
   }, [location]);
 
-  // ── Autocomplete with debounce ───────────────────────────────────────────────
-  const handleSearchChange = useCallback((text) => {
-    setSearchText(text);
-    clearTimeout(debounceTimer.current);
+  // ── Debounced Places autocomplete ────────────────────────────────────────────
+  const handleSearchChange = useCallback((text, field) => {
+    if (field === 'origin') setOriginText(text);
+    else setDestText(text);
+
+    clearTimeout(debounceRef.current);
+    setSuggestions([]);
 
     if (text.trim().length < 2) {
-      setSuggestions([]);
       setStep(STEP.IDLE);
       return;
     }
 
     setStep(STEP.SEARCHING);
-    debounceTimer.current = setTimeout(async () => {
+    debounceRef.current = setTimeout(async () => {
       try {
         const result = await placesApi.autocomplete(text, {
           lat:          location?.latitude,
@@ -80,83 +92,115 @@ export default function HomeScreen({ navigation }) {
           sessionToken: sessionToken.current,
         });
         setSuggestions(result.data ?? []);
-      } catch {
+      } catch (err) {
+        console.error('[HomeScreen] autocomplete error:', err.message);
         setSuggestions([]);
       }
     }, DEBOUNCE_MS);
   }, [location]);
 
-  // ── Select a suggestion → get details → get estimate ────────────────────────
-  const handleSelectSuggestion = async (suggestion) => {
-    setSuggestions([]);
-    setSearchText(suggestion.mainText);
+  // ── Calculate route estimate ─────────────────────────────────────────────────
+  const calculateEstimate = useCallback(async (origin, dest) => {
     setStep(STEP.ESTIMATING);
+    setSuggestions([]);
+    setActiveField(null);
 
     try {
-      // 1. Convert placeId → coordinates
-      const detailsResult = await placesApi.details(suggestion.placeId, sessionToken.current);
-      const dest = {
-        address: suggestion.description,
-        lat:     detailsResult.data.lat,
-        lng:     detailsResult.data.lng,
-      };
-      setDestPlace(dest);
-      dispatch(setDestination(dest));
-
-      // Renew session token after selection (Google billing requirement)
-      sessionToken.current = String(Date.now());
-
-      // 2. Get fare estimate for all categories
-      const origin = originPlace ?? {
-        address: 'Mi ubicación actual',
-        lat: location.latitude,
-        lng: location.longitude,
-      };
-      dispatch(setOrigin(origin));
-
-      const estimateResult = await tripApi.estimate({
+      const result = await tripApi.estimate({
         originLat: origin.lat,
         originLng: origin.lng,
         destLat:   dest.lat,
         destLng:   dest.lng,
       });
-      setEstimate(estimateResult.data);
+      setEstimate(result.data);
 
-      // 3. Fit map to show both markers
       mapRef.current?.fitToCoordinates(
         [
           { latitude: origin.lat, longitude: origin.lng },
           { latitude: dest.lat,   longitude: dest.lng },
         ],
-        { edgePadding: { top: 80, right: 60, bottom: 320, left: 60 }, animated: true }
+        { edgePadding: { top: 80, right: 60, bottom: 340, left: 60 }, animated: true },
       );
-
       setStep(STEP.READY);
     } catch (error) {
-      Alert.alert('Error', 'No se pudo calcular la ruta. Intenta de nuevo.');
+      Alert.alert('Error de ruta', error.message || 'No se pudo calcular la ruta. Intenta de nuevo.');
+      setStep(STEP.IDLE);
+    }
+  }, []);
+
+  // ── Select autocomplete suggestion ───────────────────────────────────────────
+  const handleSelectSuggestion = async (suggestion) => {
+    setSuggestions([]);
+    try {
+      const detailsResult = await placesApi.details(suggestion.placeId, sessionToken.current);
+      sessionToken.current = String(Date.now()); // renew session token (Google billing)
+
+      const place = {
+        address: suggestion.description,
+        lat:     detailsResult.data.lat,
+        lng:     detailsResult.data.lng,
+      };
+
+      if (activeField === 'origin') {
+        setOriginPlace(place);
+        setOriginText(suggestion.mainText);
+        dispatch(setOrigin(place));
+
+        if (destPlace) {
+          calculateEstimate(place, destPlace);
+        } else {
+          setStep(STEP.IDLE);
+          setActiveField(null);
+          setTimeout(() => destInputRef.current?.focus(), 200);
+        }
+      } else {
+        setDestPlace(place);
+        setDestText(suggestion.mainText);
+        dispatch(setDestination(place));
+
+        const currentOrigin = originPlace ?? (location
+          ? { address: 'Mi ubicación actual', lat: location.latitude, lng: location.longitude }
+          : null);
+
+        if (currentOrigin) {
+          if (!originPlace) {
+            setOriginPlace(currentOrigin);
+            setOriginText('Mi ubicación actual');
+            dispatch(setOrigin(currentOrigin));
+          }
+          calculateEstimate(currentOrigin, place);
+        } else {
+          Alert.alert('Origen requerido', 'Por favor ingresa el punto de recogida antes de seleccionar el destino.');
+          setStep(STEP.IDLE);
+        }
+      }
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo obtener los detalles del lugar. Intenta de nuevo.');
       setStep(STEP.IDLE);
     }
   };
 
-  // ── Request trip (U-03.5) ────────────────────────────────────────────────────
+  // ── Request trip ─────────────────────────────────────────────────────────────
   const handleRequestTrip = async () => {
     const fare = estimate?.fares?.[selectedCategory]?.fare;
-
-    // U-03.6 — 50k COP limit warning
     if (fare > MAX_FARE) {
       Alert.alert(
         'Límite de tarifa',
-        `La tarifa ${formatCOP(fare)} supera el máximo permitido de ${formatCOP(MAX_FARE)}. Selecciona una categoría más económica.`
+        `La tarifa ${formatCOP(fare)} supera el máximo de ${formatCOP(MAX_FARE)}. Elige una categoría más económica.`,
       );
       return;
     }
 
     setStep(STEP.REQUESTING);
     try {
-      const origin = originPlace ?? { address: 'Mi ubicación actual', lat: location.latitude, lng: location.longitude };
+      const origin = originPlace ?? {
+        address: 'Mi ubicación actual',
+        lat:     location.latitude,
+        lng:     location.longitude,
+      };
 
       const result = await tripApi.create({
-        origin:          { address: origin.address,   lat: origin.lat,   lng: origin.lng },
+        origin:          { address: origin.address,    lat: origin.lat,    lng: origin.lng },
         destination:     { address: destPlace.address, lat: destPlace.lat, lng: destPlace.lng },
         vehicleCategory: selectedCategory,
         paymentMethod:   'card',
@@ -172,26 +216,28 @@ export default function HomeScreen({ navigation }) {
   };
 
   // ── Reset to idle ─────────────────────────────────────────────────────────────
-  const handleClearDestination = () => {
+  const handleClear = () => {
     setDestPlace(null);
     setEstimate(null);
-    setSearchText('');
+    setDestText('');
     setSuggestions([]);
     setSelectedCategory('economy');
+    setActiveField(null);
     setStep(STEP.IDLE);
     if (location) {
       mapRef.current?.animateToRegion({
-        latitude:       location.latitude,
-        longitude:      location.longitude,
+        latitude:      location.latitude,
+        longitude:     location.longitude,
         latitudeDelta:  0.01,
         longitudeDelta: 0.01,
       }, 400);
     }
   };
 
-  const isRequesting = step === STEP.REQUESTING;
-  const selectedFare = estimate?.fares?.[selectedCategory]?.fare;
-  const overLimit    = selectedFare > MAX_FARE;
+  const isRequesting  = step === STEP.REQUESTING;
+  const selectedFare  = estimate?.fares?.[selectedCategory]?.fare;
+  const overLimit     = selectedFare > MAX_FARE;
+  const showResults   = step === STEP.SEARCHING;
 
   return (
     <View style={styles.container}>
@@ -205,7 +251,7 @@ export default function HomeScreen({ navigation }) {
         showsUserLocation
         showsMyLocationButton={false}
       >
-        {originPlace && location && (
+        {originPlace && (
           <Marker
             coordinate={{ latitude: originPlace.lat, longitude: originPlace.lng }}
             title="Origen"
@@ -219,6 +265,15 @@ export default function HomeScreen({ navigation }) {
             pinColor={COLORS.danger}
           />
         )}
+        {/* Route polyline when estimate is ready */}
+        {estimate?.route?.polyline && (
+          <Polyline
+            coordinates={decodePolyline(estimate.route.polyline)}
+            strokeColor={COLORS.primary}
+            strokeWidth={4}
+            lineDashPattern={[0]}
+          />
+        )}
       </MapView>
 
       {/* ── My location button ── */}
@@ -227,8 +282,10 @@ export default function HomeScreen({ navigation }) {
         onPress={() => {
           if (location) {
             mapRef.current?.animateToRegion({
-              latitude: location.latitude, longitude: location.longitude,
-              latitudeDelta: 0.01, longitudeDelta: 0.01,
+              latitude:      location.latitude,
+              longitude:     location.longitude,
+              latitudeDelta:  0.01,
+              longitudeDelta: 0.01,
             }, 400);
           }
         }}
@@ -245,40 +302,76 @@ export default function HomeScreen({ navigation }) {
 
           {/* Greeting */}
           <Text style={styles.greeting}>
-            👋 Hola, {dbUser?.fullName?.split(' ')[0] ?? 'viajero'}
+            Hola, {dbUser?.fullName?.split(' ')[0] ?? 'viajero'}
           </Text>
 
-          {/* Origin row */}
-          <View style={styles.locationRow}>
+          {/* ── Origin input ── */}
+          <View style={[styles.inputRow, activeField === 'origin' && styles.inputRowFocused]}>
             <View style={styles.dotOrigin} />
-            <Text style={styles.locationText} numberOfLines={1}>
-              {originPlace?.address ?? 'Obteniendo ubicación…'}
-            </Text>
+            <TextInput
+              style={styles.locationInput}
+              placeholder="¿Desde dónde te recogemos?"
+              placeholderTextColor={COLORS.gray}
+              value={originText}
+              onFocus={() => {
+                setActiveField('origin');
+                // Clear "Mi ubicación actual" to let user type freely
+                if (originText === 'Mi ubicación actual') setOriginText('');
+              }}
+              onBlur={() => {
+                // Restore GPS text if user cleared without selecting
+                if (!originText.trim() && originPlace) setOriginText(originPlace.address);
+              }}
+              onChangeText={text => handleSearchChange(text, 'origin')}
+              autoCorrect={false}
+              returnKeyType="next"
+              onSubmitEditing={() => destInputRef.current?.focus()}
+            />
+            {activeField === 'origin' && originText.length > 0 && (
+              <TouchableOpacity
+                onPress={() => {
+                  setOriginText('');
+                  setSuggestions([]);
+                  setStep(STEP.IDLE);
+                }}
+              >
+                <Icon name="close-circle" size={18} color={COLORS.gray} />
+              </TouchableOpacity>
+            )}
           </View>
 
-          {/* Destination search */}
-          <View style={styles.searchRow}>
+          {/* Route line between dots */}
+          <View style={styles.routeConnector}>
+            <View style={styles.routeLine} />
+          </View>
+
+          {/* ── Destination input ── */}
+          <View style={[styles.inputRow, activeField === 'destination' && styles.inputRowFocused]}>
             <View style={styles.dotDest} />
-            <View style={styles.searchInputWrapper}>
-              <TextInput
-                style={styles.searchInput}
-                placeholder="¿A dónde vas?"
-                placeholderTextColor={COLORS.gray}
-                value={searchText}
-                onChangeText={handleSearchChange}
-                autoCorrect={false}
-                returnKeyType="search"
-              />
-              {searchText.length > 0 && (
-                <TouchableOpacity onPress={handleClearDestination} style={styles.clearBtn}>
-                  <Icon name="close-circle" size={18} color={COLORS.gray} />
-                </TouchableOpacity>
-              )}
-            </View>
+            <TextInput
+              ref={destInputRef}
+              style={styles.locationInput}
+              placeholder="¿A dónde vas?"
+              placeholderTextColor={COLORS.gray}
+              value={destText}
+              onFocus={() => setActiveField('destination')}
+              onChangeText={text => handleSearchChange(text, 'destination')}
+              autoCorrect={false}
+              returnKeyType="search"
+            />
+            {(destText.length > 0 || step === STEP.READY) && (
+              <TouchableOpacity onPress={handleClear}>
+                <Icon
+                  name={step === STEP.READY ? 'refresh' : 'close-circle'}
+                  size={18}
+                  color={COLORS.gray}
+                />
+              </TouchableOpacity>
+            )}
           </View>
 
-          {/* Suggestions list */}
-          {step === STEP.SEARCHING && (
+          {/* ── Suggestions list ── */}
+          {showResults && (
             <FlatList
               data={suggestions}
               keyExtractor={item => item.placeId}
@@ -299,15 +392,13 @@ export default function HomeScreen({ navigation }) {
                   </View>
                 </TouchableOpacity>
               )}
-              ListEmptyComponent={() =>
-                searchText.length >= 2 && (
-                  <Text style={styles.noResults}>Sin resultados para "{searchText}"</Text>
-                )
-              }
+              ListEmptyComponent={() => (
+                <Text style={styles.noResults}>Sin resultados</Text>
+              )}
             />
           )}
 
-          {/* Estimating loader */}
+          {/* ── Estimating loader ── */}
           {step === STEP.ESTIMATING && (
             <View style={styles.estimatingRow}>
               <ActivityIndicator color={COLORS.primary} />
@@ -315,25 +406,22 @@ export default function HomeScreen({ navigation }) {
             </View>
           )}
 
-          {/* Ready state: vehicle selector + estimate + button */}
+          {/* ── Ready: vehicle + fare + request button ── */}
           {step === STEP.READY && estimate && (
             <>
-              {/* Route summary */}
               <View style={styles.routeSummary}>
                 <Icon name="navigate-outline" size={16} color={COLORS.primary} />
                 <Text style={styles.routeText}>
-                  {estimate.route.distanceText}  ·  {estimate.route.durationText}
+                  {estimate.route.distanceText} · {estimate.route.durationText}
                 </Text>
               </View>
 
-              {/* Vehicle selector */}
               <VehicleSelector
                 fares={estimate.fares}
                 selected={selectedCategory}
                 onSelect={setSelectedCategory}
               />
 
-              {/* Fare display */}
               <View style={styles.fareRow}>
                 <View>
                   <Text style={styles.fareLabel}>Tarifa estimada</Text>
@@ -348,12 +436,8 @@ export default function HomeScreen({ navigation }) {
                 </Text>
               </View>
 
-              {/* Request button */}
               <TouchableOpacity
-                style={[
-                  styles.requestBtn,
-                  (overLimit || isRequesting) && styles.requestBtnDisabled,
-                ]}
+                style={[styles.requestBtn, (overLimit || isRequesting) && styles.requestBtnDisabled]}
                 onPress={handleRequestTrip}
                 disabled={overLimit || isRequesting}
                 activeOpacity={0.85}
@@ -400,25 +484,32 @@ const styles = StyleSheet.create({
 
   greeting: { fontSize: FONT.md, fontWeight: '700', color: COLORS.dark, marginBottom: SPACING.sm },
 
-  locationRow: {
+  inputRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.lightGray,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: '#F7F8FA',
+    borderWidth: 1,
+    borderColor: 'transparent',
+    marginBottom: 4,
   },
+  inputRowFocused: {
+    borderColor: COLORS.primary,
+    backgroundColor: '#F0F7FF',
+  },
+
   dotOrigin: {
     width: 12, height: 12, borderRadius: 6,
     backgroundColor: COLORS.primary, borderWidth: 2, borderColor: '#fff',
-    shadowColor: COLORS.primary, shadowOpacity: 0.4, shadowRadius: 3, elevation: 3,
+    shadowColor: COLORS.primary, shadowOpacity: 0.4, shadowRadius: 3, elevation: 2,
   },
-  locationText: { flex: 1, fontSize: FONT.base, color: COLORS.dark },
+  dotDest: { width: 12, height: 12, borderRadius: 3, backgroundColor: COLORS.danger },
 
-  searchRow:         { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
-  dotDest:           { width: 12, height: 12, borderRadius: 3, backgroundColor: COLORS.danger },
-  searchInputWrapper: { flex: 1, flexDirection: 'row', alignItems: 'center' },
-  searchInput: {
-    flex: 1, fontSize: FONT.base, color: COLORS.dark,
-    paddingVertical: 4,
-  },
-  clearBtn: { padding: 4 },
+  locationInput: { flex: 1, fontSize: FONT.base, color: COLORS.dark, paddingVertical: 4 },
+
+  routeConnector: { alignItems: 'flex-start', paddingLeft: 14, marginVertical: 1 },
+  routeLine:      { width: 2, height: 10, backgroundColor: COLORS.lightGray, marginLeft: 5 },
 
   suggestionList: { maxHeight: 220, marginTop: 4 },
   separator:      { height: 1, backgroundColor: COLORS.lightGray },

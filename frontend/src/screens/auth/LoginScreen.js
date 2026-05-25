@@ -2,29 +2,32 @@ import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform,
-  ScrollView, ActivityIndicator,
+  ScrollView, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon        from 'react-native-vector-icons/Ionicons';
 import { useAuth } from '../../context/AuthContext';
 import ErrorBanner from '../../components/common/ErrorBanner';
+import logger      from '../../utils/logger';
 import { COLORS, SPACING, RADIUS, FONT, SHADOW } from '../../constants/theme';
 
 export default function LoginScreen({ navigation }) {
-  const { signIn } = useAuth();
+  const { signIn, resetPassword } = useAuth();
 
-  const [email,    setEmail]    = useState('');
-  const [password, setPassword] = useState('');
-  const [showPass, setShowPass] = useState(false);
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState('');
+  const [email,       setEmail]       = useState('');
+  const [password,    setPassword]    = useState('');
+  const [showPass,    setShowPass]    = useState(false);
+  const [loading,     setLoading]     = useState(false);
+  const [resetting,   setResetting]   = useState(false);
+  const [error,       setError]       = useState('');
+  const [debugCode,   setDebugCode]   = useState('');
 
-  // Clear error as soon as the user edits any field
-  const handleEmailChange = v    => { setError(''); setEmail(v); };
-  const handlePasswordChange = v => { setError(''); setPassword(v); };
+  const handleEmailChange    = v => { setError(''); setDebugCode(''); setEmail(v); };
+  const handlePasswordChange = v => { setError(''); setDebugCode(''); setPassword(v); };
 
   const handleLogin = async () => {
     setError('');
+    setDebugCode('');
 
     if (!email.trim()) {
       setError('Ingresa tu correo electrónico para continuar.');
@@ -36,17 +39,51 @@ export default function LoginScreen({ navigation }) {
     }
 
     setLoading(true);
+    const normalizedEmail = email.trim().toLowerCase();
+    logger.step('Login', `Intentando login: ${normalizedEmail}`);
     try {
-      await signIn(email.trim().toLowerCase(), password);
-      // AppNavigator reacts automatically — no manual navigation needed
+      await signIn(normalizedEmail, password);
+      logger.ok('Login', 'Firebase auth OK — esperando AuthContext…');
+      // onAuthStateChanged toma el control desde aquí
     } catch (err) {
+      logger.error('Login', `Falló — code:${err.code} | message:${err.message}`);
+      setDebugCode(err.code ?? 'sin_código');
       setError(friendlyMessage(err.code));
     } finally {
       setLoading(false);
     }
   };
 
-  const isDisabled = loading || !email.trim() || !password;
+  const handleForgotPassword = async () => {
+    const emailToReset = email.trim().toLowerCase();
+    if (!emailToReset) {
+      setError('Escribe tu correo primero, luego toca "Olvidé mi contraseña".');
+      return;
+    }
+
+    setResetting(true);
+    logger.step('Login', `Enviando reset de contraseña a: ${emailToReset}`);
+    try {
+      await resetPassword(emailToReset);
+      logger.ok('Login', 'Email de reset enviado');
+      Alert.alert(
+        'Correo enviado',
+        `Te enviamos un enlace para restablecer tu contraseña a ${emailToReset}. Revisa tu bandeja de entrada.`,
+        [{ text: 'Entendido', style: 'default' }]
+      );
+    } catch (err) {
+      logger.error('Login', `Reset falló — code:${err.code} | ${err.message}`);
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-email') {
+        setError('No existe ninguna cuenta con ese correo.');
+      } else {
+        setError('No se pudo enviar el correo. Verifica tu conexión e inténtalo de nuevo.');
+      }
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const isDisabled = loading || resetting || !email.trim() || !password;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -71,13 +108,20 @@ export default function LoginScreen({ navigation }) {
           {/* ── Form card ── */}
           <View style={styles.card}>
 
-            {/* Error banner — animated, no Alert pop-up */}
-            <ErrorBanner message={error} onDismiss={() => setError('')} />
+            <ErrorBanner message={error} onDismiss={() => { setError(''); setDebugCode(''); }} />
+
+            {/* Debug code visible en desarrollo */}
+            {__DEV__ && debugCode ? (
+              <View style={styles.debugRow}>
+                <Icon name="bug-outline" size={13} color="#888" />
+                <Text style={styles.debugText}>Firebase code: {debugCode}</Text>
+              </View>
+            ) : null}
 
             {/* Email */}
             <View style={styles.field}>
               <Text style={styles.label}>Correo electrónico</Text>
-              <View style={[styles.inputRow, error && !password && styles.inputRowError]}>
+              <View style={styles.inputRow}>
                 <Icon name="mail-outline" size={18} color={COLORS.gray} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
@@ -88,7 +132,7 @@ export default function LoginScreen({ navigation }) {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
-                  editable={!loading}
+                  editable={!loading && !resetting}
                 />
               </View>
             </View>
@@ -106,7 +150,7 @@ export default function LoginScreen({ navigation }) {
                   onChangeText={handlePasswordChange}
                   secureTextEntry={!showPass}
                   autoCapitalize="none"
-                  editable={!loading}
+                  editable={!loading && !resetting}
                 />
                 <TouchableOpacity
                   onPress={() => setShowPass(v => !v)}
@@ -120,6 +164,18 @@ export default function LoginScreen({ navigation }) {
                 </TouchableOpacity>
               </View>
             </View>
+
+            {/* Olvidé mi contraseña */}
+            <TouchableOpacity
+              style={styles.forgotBtn}
+              onPress={handleForgotPassword}
+              disabled={loading || resetting}
+            >
+              {resetting
+                ? <ActivityIndicator size="small" color={COLORS.primary} />
+                : <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
+              }
+            </TouchableOpacity>
 
             {/* Login button */}
             <TouchableOpacity
@@ -148,7 +204,7 @@ export default function LoginScreen({ navigation }) {
             <TouchableOpacity
               style={styles.secondaryBtn}
               onPress={() => navigation.navigate('Register')}
-              disabled={loading}
+              disabled={loading || resetting}
               activeOpacity={0.85}
             >
               <Icon name="person-add-outline" size={18} color={COLORS.primary} />
@@ -157,7 +213,6 @@ export default function LoginScreen({ navigation }) {
 
           </View>
 
-          {/* Footer note */}
           <Text style={styles.footer}>
             Al continuar aceptas nuestros Términos de Uso y Política de Privacidad.
           </Text>
@@ -168,7 +223,6 @@ export default function LoginScreen({ navigation }) {
   );
 }
 
-// ── All Firebase error codes → friendly Spanish messages ──────────────────────
 function friendlyMessage(code) {
   const map = {
     'auth/user-not-found':
@@ -178,15 +232,15 @@ function friendlyMessage(code) {
     'auth/invalid-email':
       'El formato del correo no es válido. Ejemplo: usuario@correo.com',
     'auth/invalid-credential':
-      'El correo o la contraseña no coinciden. Verifica tus datos.',
+      'El correo o la contraseña no coinciden. Verifica tus datos o usa "¿Olvidaste tu contraseña?"',
     'auth/too-many-requests':
-      'Tu cuenta fue bloqueada temporalmente por múltiples intentos fallidos. Intenta más tarde o restablece tu contraseña.',
+      'Tu cuenta fue bloqueada temporalmente. Usa "¿Olvidaste tu contraseña?" para restablecerla o espera unos minutos.',
     'auth/user-disabled':
       'Esta cuenta ha sido desactivada. Comunícate con soporte.',
     'auth/network-request-failed':
-      'Sin conexión a internet. Verifica tu red e intenta de nuevo.',
+      'No se pudo conectar con el servidor de autenticación. Verifica tu conexión.',
     'auth/configuration-not':
-      'El servicio de autenticación no está disponible en este momento. Verifica tu conexión e intenta de nuevo.',
+      'El servicio de autenticación no está disponible en este momento.',
     'auth/internal-error':
       'Ocurrió un problema interno. Por favor intenta de nuevo en unos segundos.',
     'auth/operation-not-allowed':
@@ -220,6 +274,12 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
 
+  debugRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#1a1a2e', borderRadius: 6, padding: 8, marginBottom: 8,
+  },
+  debugText: { fontSize: 11, color: '#aaa', fontFamily: 'monospace' },
+
   field:    { marginBottom: SPACING.sm + 4 },
   label:    { fontSize: FONT.sm, fontWeight: '600', color: COLORS.gray, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
 
@@ -229,9 +289,11 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm, paddingHorizontal: 12,
     backgroundColor: COLORS.inputBg, height: 50,
   },
-  inputRowError: { borderColor: COLORS.danger },
-  inputIcon:     { marginRight: 10 },
-  input:         { flex: 1, fontSize: FONT.base, color: COLORS.dark },
+  inputIcon: { marginRight: 10 },
+  input:     { flex: 1, fontSize: FONT.base, color: COLORS.dark },
+
+  forgotBtn:  { alignSelf: 'flex-end', marginBottom: SPACING.sm, minHeight: 24, justifyContent: 'center' },
+  forgotText: { fontSize: FONT.sm, color: COLORS.primary, fontWeight: '600' },
 
   primaryBtn: {
     backgroundColor: COLORS.primary, height: 52,

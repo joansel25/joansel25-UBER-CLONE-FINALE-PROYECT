@@ -1,13 +1,16 @@
-import client from './client';
+import { getPlacesAutocomplete, getPlaceDetails } from '../services/mapsService';
 
 const placesApi = {
-  // input: text typed by user | lat,lng: bias results near user | sessionToken: billing group
-  autocomplete: (input, { lat, lng, sessionToken } = {}) =>
-    client.get('/places/autocomplete', { params: { input, lat, lng, sessionToken } }),
+  autocomplete: async (input, { lat, lng, sessionToken } = {}) => {
+    const location = (lat != null && lng != null) ? [lat, lng] : null;
+    const results  = await getPlacesAutocomplete(input, sessionToken, location);
+    return { data: results };
+  },
 
-  // placeId from autocomplete → coordinates + formatted address
-  details: (placeId, sessionToken) =>
-    client.get('/places/details', { params: { placeId, sessionToken } }),
+  details: async (placeId, sessionToken) => {
+    const result = await getPlaceDetails(placeId, sessionToken);
+    return { data: result };
+  },
 };
 
 export default placesApi;

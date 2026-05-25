@@ -149,6 +149,14 @@ export default function PaymentMethodsScreen({ navigation }) {
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 
+      {/* ── Stripe test mode hint ── */}
+      <View style={styles.testBanner}>
+        <Icon name="information-circle-outline" size={14} color="#666" />
+        <Text style={styles.testBannerText}>
+          Modo prueba · Usa 4242 4242 4242 4242 · Fecha: 12/34 · CVC: 123
+        </Text>
+      </View>
+
       {/* ── Card list ── */}
       {loading ? (
         <View style={styles.center}>
@@ -235,6 +243,13 @@ const styles = StyleSheet.create({
     fontSize: FONT.sm, color: COLORS.gray,
     textAlign: 'center', paddingHorizontal: SPACING.lg,
   },
+
+  testBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#FFF8E1', paddingHorizontal: SPACING.md, paddingVertical: 8,
+    borderBottomWidth: 1, borderBottomColor: '#FFE082',
+  },
+  testBannerText: { flex: 1, fontSize: 11, color: '#666' },
 
   footer: { padding: SPACING.md, backgroundColor: COLORS.white, borderTopWidth: 1, borderTopColor: COLORS.border },
   addBtn: {

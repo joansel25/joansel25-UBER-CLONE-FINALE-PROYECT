@@ -6,10 +6,11 @@ import {
 } from 'react-native';
 import { SafeAreaView }  from 'react-native-safe-area-context';
 import Icon              from 'react-native-vector-icons/Ionicons';
-import { getAuth, createUserWithEmailAndPassword } from '@react-native-firebase/auth';
-import { useAuth }       from '../../context/AuthContext';
-import userApi           from '../../api/userApi';
-import ErrorBanner       from '../../components/common/ErrorBanner';
+import { getAuth, createUserWithEmailAndPassword, deleteUser } from '@react-native-firebase/auth';
+import { useAuth } from '../../context/AuthContext';
+import userApi     from '../../api/userApi';
+import logger      from '../../utils/logger';
+import ErrorBanner from '../../components/common/ErrorBanner';
 import { COLORS, SPACING, RADIUS, FONT, SHADOW } from '../../constants/theme';
 
 const GENDER_OPTIONS = [
@@ -26,10 +27,14 @@ const LANGUAGE_OPTIONS = [
 const EMPTY_ERRORS = { fullName: '', email: '', phone: '', gender: '', password: '', confirm: '' };
 
 export default function RegisterScreen({ navigation }) {
-  const { refreshUser, signOut, firebaseUser } = useAuth();
+  const { forceUserFound, refreshUser, signIn, signOut, firebaseUser, setIsRegistering } = useAuth();
+
+  const isCompletingProfile = !!firebaseUser;
 
   const [form, setForm] = useState({
-    fullName: '', email: '', phone: '',
+    fullName: '',
+    email:    firebaseUser?.email ?? '',
+    phone:    '',
     password: '', confirm: '', gender: '', language: 'ES',
   });
   const [fieldErrors,     setFieldErrors]     = useState(EMPTY_ERRORS);
@@ -38,15 +43,15 @@ export default function RegisterScreen({ navigation }) {
   const [showConfirm,     setShowConfirm]     = useState(false);
   const [showGenderModal, setShowGenderModal] = useState(false);
   const [loading,         setLoading]         = useState(false);
+  const [step,            setStep]            = useState('');
 
   const set = (key, value) => {
     setForm(prev => ({ ...prev, [key]: value }));
-    // Clear field error on edit
     if (fieldErrors[key]) setFieldErrors(prev => ({ ...prev, [key]: '' }));
     setGlobalError('');
   };
 
-  // ── Per-field validation ───────────────────────────────────────────────────
+  // ── Per-field validation ──────────────────────────────────────────────────
   const validate = () => {
     const errs = { ...EMPTY_ERRORS };
     let valid = true;
@@ -54,20 +59,22 @@ export default function RegisterScreen({ navigation }) {
     if (!form.fullName.trim() || form.fullName.trim().length < 3) {
       errs.fullName = 'Mínimo 3 caracteres.'; valid = false;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-      errs.email = 'Formato inválido. Ejemplo: usuario@correo.com'; valid = false;
+    if (!isCompletingProfile) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+        errs.email = 'Formato inválido. Ejemplo: usuario@correo.com'; valid = false;
+      }
+      if (form.password.length < 6) {
+        errs.password = 'La contraseña debe tener al menos 6 caracteres.'; valid = false;
+      }
+      if (form.password !== form.confirm) {
+        errs.confirm = 'Las contraseñas no coinciden.'; valid = false;
+      }
     }
     if (!/^\d{7,}$/.test(form.phone)) {
       errs.phone = 'Solo números, mínimo 7 dígitos.'; valid = false;
     }
     if (!form.gender) {
       errs.gender = 'Selecciona un género para continuar.'; valid = false;
-    }
-    if (form.password.length < 6) {
-      errs.password = 'La contraseña debe tener al menos 6 caracteres.'; valid = false;
-    }
-    if (form.password !== form.confirm) {
-      errs.confirm = 'Las contraseñas no coinciden.'; valid = false;
     }
 
     setFieldErrors(errs);
@@ -78,43 +85,105 @@ export default function RegisterScreen({ navigation }) {
     setGlobalError('');
     if (!validate()) return;
     setLoading(true);
+    setIsRegistering(true);
+
+    let firebaseCreatedHere = false;
+    let registerSucceeded   = false;
 
     try {
-      // 1. Create Firebase Auth account
-      const credential = await createUserWithEmailAndPassword(
-        getAuth(),
-        form.email.trim().toLowerCase(),
-        form.password,
-      );
-      const { uid } = credential.user;
+      let uid, email;
 
-      // 2. Register profile in MongoDB
-      await userApi.register({
+      logger.step('Register', isCompletingProfile ? 'Modo: completar perfil existente' : 'Modo: registro completo');
+
+      if (isCompletingProfile) {
+        uid   = firebaseUser.uid;
+        email = firebaseUser.email;
+        logger.info('Register', `Reutilizando cuenta Firebase: ${email}`);
+      } else {
+        setStep('Creando cuenta en Firebase...');
+        logger.step('Register', `Paso 1 — Creando cuenta Firebase: ${form.email.trim()}`);
+        const credential = await createUserWithEmailAndPassword(
+          getAuth(),
+          form.email.trim().toLowerCase(),
+          form.password,
+        );
+        uid   = credential.user.uid;
+        email = form.email.trim().toLowerCase();
+        firebaseCreatedHere = true;
+        logger.ok('Register', `Paso 1 ✓ Firebase UID: ${uid.slice(0, 8)}…`);
+      }
+
+      setStep('Guardando tu perfil...');
+      logger.step('Register', 'Paso 2 — Guardando perfil en Firestore…');
+      const registered = await userApi.register({
         fullName:    form.fullName.trim(),
-        email:       form.email.trim().toLowerCase(),
+        email,
         phone:       form.phone.trim(),
         gender:      form.gender,
         language:    form.language,
         firebaseUid: uid,
         role:        'passenger',
       });
+      registerSucceeded = true;
+      logger.ok('Register', 'Paso 2 ✓ Perfil guardado en Firestore');
 
-      // 3. Pull profile into AuthContext → AppNavigator routes to Main
-      await refreshUser();
+      setStep('Entrando a la app...');
+      logger.step('Register', 'Paso 3 — Activando sesión en contexto…');
+      // Set user directly from what we just wrote — no extra Firestore GET needed
+      await forceUserFound(registered.data);
+      logger.ok('Register', 'Paso 3 ✓ Registro completo — redirigiendo a la app');
 
     } catch (err) {
-      console.log('[Register Error] code:', err.code, '| message:', err.message);
-      // Rollback: if Firebase created the account but the backend failed,
-      // delete the Firebase account to avoid orphaned accounts.
-      // Firebase errors have err.code starting with 'auth/'; backend/network
-      // errors don't — those are the cases where we need to rollback.
-      const fbUser = getAuth().currentUser;
-      if (fbUser && !err.code?.startsWith('auth/')) {
-        await fbUser.delete().catch(() => null);
+      logger.error('Register', `Error — code:${err.code ?? 'sin código'} | statusCode:${err.statusCode ?? 'n/a'} | ${err.message}`);
+
+      // Email ya existe en Firebase → intentar iniciar sesión automáticamente
+      if (err.code === 'auth/email-already-in-use') {
+        logger.info('Register', 'Email ya registrado en Firebase — intentando auto-login con misma contraseña...');
+        try {
+          await signIn(form.email.trim().toLowerCase(), form.password);
+          logger.ok('Register', 'Auto-login exitoso — onAuthStateChanged detectará el perfil');
+          // onAuthStateChanged se encarga: si hay perfil Firestore → app principal
+          // si no hay perfil Firestore (profileStatus = not_found) → RegisterScreen (completar perfil)
+          return;
+        } catch (signInErr) {
+          logger.warn('Register', `Auto-login fallido — code:${signInErr.code} | ${signInErr.message}`);
+          // Contraseña diferente a la del intento anterior — pedir que vaya a login
+          setGlobalError(
+            'Ya existe una cuenta con ese correo pero con otra contraseña. ' +
+            'Ve a "Iniciar sesión" y usa tu contraseña anterior. ' +
+            'Si la olvidaste, usa la opción "Olvidé mi contraseña".'
+          );
+          return;
+        }
       }
-      setGlobalError(friendlyMessage(err.code, err.message));
+
+      // Error al guardar en Firestore → rollback solo si fue error de servidor
+      if (firebaseCreatedHere && !registerSucceeded) {
+        const isFirebaseError   = err.code?.startsWith('auth/');
+        const isValidationError = err.statusCode === 400 || err.statusCode === 409;
+        // Do NOT rollback on permission errors — the Firebase Auth account is valid,
+        // the problem is Firestore security rules. User can fix rules and try again.
+        const isPermissionError = err.isPermissionError || err.statusCode === 403;
+
+        if (!isFirebaseError && !isValidationError && !isPermissionError) {
+          logger.warn('Register', 'Error de red/servidor — haciendo rollback de cuenta Firebase…');
+          const fbUser = getAuth().currentUser;
+          if (fbUser) {
+            try {
+              await deleteUser(fbUser);
+              logger.ok('Register', 'Rollback completado — cuenta Firebase eliminada');
+            } catch (rollbackErr) {
+              logger.error('Register', `Rollback falló: ${rollbackErr.message} — usuario Firebase puede quedar huérfano`);
+            }
+          }
+        }
+      }
+
+      setGlobalError(friendlyMessage(err.code, err.message, err.statusCode));
     } finally {
+      setIsRegistering(false);
       setLoading(false);
+      setStep('');
     }
   };
 
@@ -134,17 +203,28 @@ export default function RegisterScreen({ navigation }) {
 
           {/* ── Header ── */}
           <View style={styles.header}>
-            <Text style={styles.title}>Crear cuenta</Text>
+            <Text style={styles.title}>
+              {isCompletingProfile ? 'Completa tu perfil' : 'Crear cuenta'}
+            </Text>
             <Text style={styles.subtitle}>
-              Completa tu información para comenzar
+              {isCompletingProfile
+                ? 'Tu cuenta ya existe. Ingresa tus datos para continuar.'
+                : 'Completa tu información para comenzar'}
             </Text>
           </View>
 
           {/* ── Form card ── */}
           <View style={styles.card}>
 
-            {/* Global error banner */}
             <ErrorBanner message={globalError} onDismiss={() => setGlobalError('')} />
+
+            {/* Indicador de paso actual */}
+            {loading && step ? (
+              <View style={styles.stepRow}>
+                <ActivityIndicator size="small" color={COLORS.primary} />
+                <Text style={styles.stepText}>{step}</Text>
+              </View>
+            ) : null}
 
             {/* Full name */}
             <Field label="Nombre completo" error={fieldErrors.fullName} required>
@@ -163,22 +243,35 @@ export default function RegisterScreen({ navigation }) {
             </Field>
 
             {/* Email */}
-            <Field label="Correo electrónico" error={fieldErrors.email} required>
-              <View style={[styles.inputRow, fieldErrors.email && styles.inputRowError]}>
-                <Icon name="mail-outline" size={18} color={COLORS.gray} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="usuario@correo.com"
-                  placeholderTextColor={COLORS.gray}
-                  value={form.email}
-                  onChangeText={v => set('email', v)}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={!loading}
-                />
+            {!isCompletingProfile && (
+              <Field label="Correo electrónico" error={fieldErrors.email} required>
+                <View style={[styles.inputRow, fieldErrors.email && styles.inputRowError]}>
+                  <Icon name="mail-outline" size={18} color={COLORS.gray} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="usuario@correo.com"
+                    placeholderTextColor={COLORS.gray}
+                    value={form.email}
+                    onChangeText={v => set('email', v)}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    editable={!loading}
+                  />
+                </View>
+              </Field>
+            )}
+
+            {isCompletingProfile && (
+              <View style={styles.fieldWrap}>
+                <Text style={styles.label}>Correo electrónico</Text>
+                <View style={[styles.inputRow, styles.inputRowReadonly]}>
+                  <Icon name="mail-outline" size={18} color={COLORS.gray} style={styles.inputIcon} />
+                  <Text style={[styles.input, { color: COLORS.gray }]}>{form.email}</Text>
+                  <Icon name="lock-closed" size={14} color={COLORS.gray} />
+                </View>
               </View>
-            </Field>
+            )}
 
             {/* Phone */}
             <Field label="Teléfono" error={fieldErrors.phone} required>
@@ -235,44 +328,47 @@ export default function RegisterScreen({ navigation }) {
             </View>
 
             {/* Password */}
-            <Field label="Contraseña" error={fieldErrors.password} hint="Mínimo 6 caracteres" required>
-              <View style={[styles.inputRow, fieldErrors.password && styles.inputRowError]}>
-                <Icon name="lock-closed-outline" size={18} color={COLORS.gray} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="••••••••"
-                  placeholderTextColor={COLORS.gray}
-                  value={form.password}
-                  onChangeText={v => set('password', v)}
-                  secureTextEntry={!showPass}
-                  autoCapitalize="none"
-                  editable={!loading}
-                />
-                <TouchableOpacity onPress={() => setShowPass(v => !v)}>
-                  <Icon name={showPass ? 'eye-off-outline' : 'eye-outline'} size={20} color={COLORS.gray} />
-                </TouchableOpacity>
-              </View>
-            </Field>
+            {!isCompletingProfile && (
+              <>
+                <Field label="Contraseña" error={fieldErrors.password} hint="Mínimo 6 caracteres" required>
+                  <View style={[styles.inputRow, fieldErrors.password && styles.inputRowError]}>
+                    <Icon name="lock-closed-outline" size={18} color={COLORS.gray} style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="••••••••"
+                      placeholderTextColor={COLORS.gray}
+                      value={form.password}
+                      onChangeText={v => set('password', v)}
+                      secureTextEntry={!showPass}
+                      autoCapitalize="none"
+                      editable={!loading}
+                    />
+                    <TouchableOpacity onPress={() => setShowPass(v => !v)}>
+                      <Icon name={showPass ? 'eye-off-outline' : 'eye-outline'} size={20} color={COLORS.gray} />
+                    </TouchableOpacity>
+                  </View>
+                </Field>
 
-            {/* Confirm password */}
-            <Field label="Confirmar contraseña" error={fieldErrors.confirm} required>
-              <View style={[styles.inputRow, fieldErrors.confirm && styles.inputRowError]}>
-                <Icon name="lock-closed-outline" size={18} color={COLORS.gray} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="••••••••"
-                  placeholderTextColor={COLORS.gray}
-                  value={form.confirm}
-                  onChangeText={v => set('confirm', v)}
-                  secureTextEntry={!showConfirm}
-                  autoCapitalize="none"
-                  editable={!loading}
-                />
-                <TouchableOpacity onPress={() => setShowConfirm(v => !v)}>
-                  <Icon name={showConfirm ? 'eye-off-outline' : 'eye-outline'} size={20} color={COLORS.gray} />
-                </TouchableOpacity>
-              </View>
-            </Field>
+                <Field label="Confirmar contraseña" error={fieldErrors.confirm} required>
+                  <View style={[styles.inputRow, fieldErrors.confirm && styles.inputRowError]}>
+                    <Icon name="lock-closed-outline" size={18} color={COLORS.gray} style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="••••••••"
+                      placeholderTextColor={COLORS.gray}
+                      value={form.confirm}
+                      onChangeText={v => set('confirm', v)}
+                      secureTextEntry={!showConfirm}
+                      autoCapitalize="none"
+                      editable={!loading}
+                    />
+                    <TouchableOpacity onPress={() => setShowConfirm(v => !v)}>
+                      <Icon name={showConfirm ? 'eye-off-outline' : 'eye-outline'} size={20} color={COLORS.gray} />
+                    </TouchableOpacity>
+                  </View>
+                </Field>
+              </>
+            )}
 
             {/* Submit */}
             <TouchableOpacity
@@ -284,22 +380,40 @@ export default function RegisterScreen({ navigation }) {
               {loading
                 ? <ActivityIndicator color={COLORS.white} size="small" />
                 : <>
-                    <Icon name="person-add-outline" size={18} color={COLORS.white} />
-                    <Text style={styles.primaryBtnText}>Crear cuenta</Text>
+                    <Icon
+                      name={isCompletingProfile ? 'checkmark-circle-outline' : 'person-add-outline'}
+                      size={18}
+                      color={COLORS.white}
+                    />
+                    <Text style={styles.primaryBtnText}>
+                      {isCompletingProfile ? 'Guardar perfil' : 'Crear cuenta'}
+                    </Text>
                   </>
               }
             </TouchableOpacity>
 
-            {/* Back to Login */}
-            {navigation && (
+            {!isCompletingProfile && navigation && (
               <TouchableOpacity
                 style={styles.loginLink}
-                onPress={() => firebaseUser ? signOut() : navigation.navigate('Login')}
+                onPress={() => navigation.navigate('Login')}
                 disabled={loading}
               >
                 <Text style={styles.loginLinkText}>
                   ¿Ya tienes cuenta?{' '}
                   <Text style={styles.loginLinkBold}>Inicia sesión</Text>
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {isCompletingProfile && (
+              <TouchableOpacity
+                style={styles.loginLink}
+                onPress={() => signOut()}
+                disabled={loading}
+              >
+                <Text style={styles.loginLinkText}>
+                  ¿No eres tú?{' '}
+                  <Text style={styles.loginLinkBold}>Cerrar sesión</Text>
                 </Text>
               </TouchableOpacity>
             )}
@@ -355,7 +469,7 @@ export default function RegisterScreen({ navigation }) {
   );
 }
 
-// ── Reusable field wrapper ────────────────────────────────────────────────────
+// ── Reusable field wrapper ──────────────────────────────────────────────────
 function Field({ label, error, hint, required, children }) {
   return (
     <View style={styles.fieldWrap}>
@@ -375,27 +489,42 @@ function Field({ label, error, hint, required, children }) {
   );
 }
 
-// ── Firebase → friendly Spanish messages ─────────────────────────────────────
-function friendlyMessage(code, fallback) {
+// ── Firebase / Network → mensajes amigables en español ────────────────────
+function friendlyMessage(code, fallback, statusCode) {
   const map = {
     'auth/email-already-in-use':
-      'Ya existe una cuenta con ese correo. ¿Quieres iniciar sesión?',
+      'Ya existe una cuenta con ese correo. Si olvidaste tu contraseña, usa la opción "Olvidé mi contraseña" en el login.',
     'auth/invalid-email':
       'El formato del correo no es válido. Ejemplo: usuario@correo.com',
     'auth/weak-password':
       'La contraseña es muy débil. Usa al menos 6 caracteres con letras y números.',
     'auth/network-request-failed':
-      'Sin conexión a internet. Verifica tu red e intenta de nuevo.',
-    'auth/configuration-not':
-      'El servicio de registro no está disponible en este momento. Verifica tu conexión e intenta más tarde.',
-    'auth/internal-error':
-      'Ocurrió un problema interno. Por favor intenta de nuevo en unos segundos.',
+      'No se pudo conectar con Firebase. Verifica tu conexión a internet.',
     'auth/too-many-requests':
       'Demasiados intentos en poco tiempo. Espera unos minutos e intenta de nuevo.',
     'auth/operation-not-allowed':
       'El registro con correo no está habilitado. Contacta al administrador.',
   };
-  return map[code] ?? fallback ?? 'Algo salió mal. Por favor intenta de nuevo.';
+
+  if (map[code]) return map[code];
+
+  if (statusCode === 400) {
+    return `Datos inválidos: ${fallback}`;
+  }
+  if (statusCode === 409 || (fallback && fallback.toLowerCase().includes('ya existe'))) {
+    return 'Ya existe un usuario con ese correo o UID. Intenta iniciar sesión.';
+  }
+  if (statusCode === 403 || code === 'permission-denied' || code === 'firestore/permission-denied') {
+    return 'Las reglas de Firestore bloquean el registro. Ve a Firebase Console → Firestore → Reglas y publica: allow read, write: if request.auth != null;';
+  }
+  if (statusCode === 408) {
+    return fallback ?? 'Sin respuesta de Firestore. Verifica tu conexión y que la base de datos esté creada en Firebase Console.';
+  }
+  if (!code && (statusCode === 0 || (typeof fallback === 'string' && fallback.toLowerCase().includes('network')))) {
+    return 'No se pudo conectar. Verifica tu conexión a internet e inténtalo de nuevo.';
+  }
+
+  return fallback ?? 'Algo salió mal. Por favor intenta de nuevo.';
 }
 
 const styles = StyleSheet.create({
@@ -413,6 +542,12 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
 
+  stepRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#F0F8FF', borderRadius: 8, padding: 10, marginBottom: SPACING.sm,
+  },
+  stepText: { fontSize: FONT.sm, color: COLORS.primary, fontWeight: '600' },
+
   fieldWrap: { marginBottom: SPACING.sm + 4 },
   label:     { fontSize: FONT.sm, fontWeight: '600', color: COLORS.gray, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
   required:  { color: COLORS.danger },
@@ -423,10 +558,11 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm, paddingHorizontal: 12,
     backgroundColor: COLORS.inputBg,
   },
-  inputRowError: { borderColor: COLORS.danger },
-  inputIcon:     { marginRight: 10 },
-  input:         { flex: 1, fontSize: FONT.base, color: COLORS.dark },
-  counter:       { fontSize: 11, color: COLORS.gray },
+  inputRowError:    { borderColor: COLORS.danger },
+  inputRowReadonly: { borderColor: COLORS.border, backgroundColor: '#F0F0F0', opacity: 0.8 },
+  inputIcon:        { marginRight: 10 },
+  input:            { flex: 1, fontSize: FONT.base, color: COLORS.dark },
+  counter:          { fontSize: 11, color: COLORS.gray },
 
   fieldErrorRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 },
   fieldError:    { fontSize: 12, color: COLORS.danger, flex: 1 },
@@ -469,7 +605,7 @@ const styles = StyleSheet.create({
     width: 40, height: 4, borderRadius: 2,
     backgroundColor: COLORS.border, alignSelf: 'center', marginBottom: SPACING.md,
   },
-  modalTitle:      { fontSize: FONT.lg, fontWeight: '800', color: COLORS.dark, marginBottom: SPACING.sm },
+  modalTitle:       { fontSize: FONT.lg, fontWeight: '800', color: COLORS.dark, marginBottom: SPACING.sm },
   optionRow: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
     paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: COLORS.lightGray,

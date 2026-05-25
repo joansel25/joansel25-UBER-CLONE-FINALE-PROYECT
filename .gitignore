@@ -3,3 +3,8 @@ Proyecto_ Final.docx
 
 # Test scripts — local only, not for deployment
 backend/test_*.js
+
+# Archivos de log — solo para depuración local
+**/*.log
+logs/
+debug-*.txt

@@ -1,21 +1,34 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   ActivityIndicator, Alert, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useStripe } from '@stripe/stripe-react-native';
+import firestore from '@react-native-firebase/firestore';
+import database  from '@react-native-firebase/database';
 
 import useTripTracking  from '../hooks/useTripTracking';
 import RatingModal      from '../components/trip/RatingModal';
 import tripApi          from '../api/tripApi';
 import paymentApi       from '../api/paymentApi';
+import decodePolyline   from '../utils/decodePolyline';
 import { useDispatch }  from 'react-redux';
 import { clearTrip }   from '../store/slices/tripSlice';
 import { COLORS, SPACING, FONT, RADIUS, SHADOW } from '../constants/theme';
 import { formatCOP }    from '../utils/formatters';
+
+// ── Simulated driver profile (for demo mode) ───────────────────────────────
+const SIM_DRIVER_ID = 'sim_driver_demo';
+const SIM_DRIVER = {
+  _id:        SIM_DRIVER_ID,
+  fullName:   'Carlos Vega',
+  profilePic: 'https://randomuser.me/api/portraits/men/47.jpg',
+  rating:     4.9,
+  phone:      '3171234567',
+};
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -49,6 +62,18 @@ function statusColor(status) {
 
 const BRAND_LABEL = { visa: 'Visa', mastercard: 'Mastercard', amex: 'Amex', discover: 'Discover' };
 
+// Subsample polyline coords for smooth but not overly frequent animation
+function samplePolyline(encoded, targetSteps = 35) {
+  const all = decodePolyline(encoded);
+  if (all.length <= targetSteps) return all;
+  const step = Math.floor(all.length / targetSteps);
+  const sampled = all.filter((_, i) => i % step === 0);
+  // Always include last point
+  const last = all[all.length - 1];
+  if (sampled[sampled.length - 1] !== last) sampled.push(last);
+  return sampled;
+}
+
 // ── Screen ─────────────────────────────────────────────────────────────────
 
 export default function FollowTravelScreen({ route, navigation }) {
@@ -62,15 +87,164 @@ export default function FollowTravelScreen({ route, navigation }) {
   const [cancelling,    setCancelling]    = useState(false);
 
   // Payment state
-  const [savedCards,      setSavedCards]      = useState([]);
-  const [selectedCardId,  setSelectedCardId]  = useState(null);
-  const [paying,          setPaying]          = useState(false);
-  const [payDone,         setPayDone]         = useState(false);
-  const [payError,        setPayError]        = useState('');
+  const [savedCards,     setSavedCards]     = useState([]);
+  const [selectedCardId, setSelectedCardId] = useState(null);
+  const [paying,         setPaying]         = useState(false);
+  const [payDone,        setPayDone]        = useState(false);
+  const [payError,       setPayError]       = useState('');
+
+  // Simulation control refs
+  const simAcceptedRef  = useRef(false);
+  const simStartedRef   = useRef(false);
+  const simIntervalRef  = useRef(null);
 
   const { trip, driverLocation, loading, error } = useTripTracking(tripId);
 
-  // Load saved cards once the trip completes with card payment
+  // ── Decoded route polyline ─────────────────────────────────────────────────
+  const routeCoords = useMemo(() => {
+    if (!trip?.polyline) return [];
+    return decodePolyline(trip.polyline);
+  }, [trip?.polyline]);
+
+  // ── Cleanup simulation on unmount ──────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+    };
+  }, []);
+
+  // ── SIMULATION STEP 1: Auto-accept after 3s in 'requested' state ───────────
+  useEffect(() => {
+    if (!trip || trip.status !== 'requested' || simAcceptedRef.current) return;
+    simAcceptedRef.current = true;
+
+    const timer = setTimeout(async () => {
+      try {
+        const origin = trip.origin;
+        // Place simulated driver ~250m away from pickup
+        const simLat = (origin?.lat ?? 4.711) + 0.0022;
+        const simLng = (origin?.lng ?? -74.072) + 0.0012;
+
+        // Write initial driver location to Realtime DB
+        await database().ref(`/drivers/${SIM_DRIVER_ID}/location`).set({
+          lat: simLat, lng: simLng, timestamp: Date.now(),
+        });
+
+        // Accept trip in Firestore
+        await firestore().collection('trips').doc(tripId).update({
+          driverId:     SIM_DRIVER_ID,
+          driver:       SIM_DRIVER,
+          participants: firestore.FieldValue.arrayUnion(SIM_DRIVER_ID),
+          status:       'accepted',
+          acceptedAt:   firestore.FieldValue.serverTimestamp(),
+        });
+      } catch (e) {
+        console.error('[Sim] accept failed:', e.message);
+      }
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [trip?.status, tripId]);
+
+  // ── SIMULATION STEP 2: Auto-start after 5s in 'accepted' state ────────────
+  useEffect(() => {
+    if (!trip || trip.status !== 'accepted' || simStartedRef.current) return;
+    simStartedRef.current = true;
+
+    // Move driver toward origin over 5s (5 steps)
+    const origin = trip.origin;
+    const driverLat = (origin?.lat ?? 4.711) + 0.0022;
+    const driverLng = (origin?.lng ?? -74.072) + 0.0012;
+    const steps = 5;
+    let step = 0;
+
+    const approachInterval = setInterval(() => {
+      step++;
+      const fraction = step / steps;
+      database().ref(`/drivers/${SIM_DRIVER_ID}/location`).set({
+        lat: driverLat + (((origin?.lat ?? 4.711) - driverLat) * fraction),
+        lng: driverLng + (((origin?.lng ?? -74.072) - driverLng) * fraction),
+        timestamp: Date.now(),
+      }).catch(() => {});
+
+      if (step >= steps) {
+        clearInterval(approachInterval);
+        tripApi.start(tripId).catch(e => console.error('[Sim] start failed:', e.message));
+      }
+    }, 1000);
+
+    return () => clearInterval(approachInterval);
+  }, [trip?.status, tripId, trip?.origin]);
+
+  // ── SIMULATION STEP 3: Animate driver along route during 'ongoing' ─────────
+  useEffect(() => {
+    if (!trip || trip.status !== 'ongoing' || !trip.polyline) return;
+    if (simIntervalRef.current) return;
+
+    const coords = samplePolyline(trip.polyline, 40);
+    if (coords.length === 0) {
+      tripApi.complete(tripId).catch(() => {});
+      return;
+    }
+
+    let step = 0;
+    simIntervalRef.current = setInterval(async () => {
+      step++;
+      if (step >= coords.length) {
+        clearInterval(simIntervalRef.current);
+        simIntervalRef.current = null;
+        // Place driver exactly at destination
+        const dest = trip.destination;
+        if (dest?.lat) {
+          await database().ref(`/drivers/${SIM_DRIVER_ID}/location`).set({
+            lat: dest.lat, lng: dest.lng, timestamp: Date.now(),
+          }).catch(() => {});
+        }
+        await tripApi.complete(tripId).catch(() => {});
+        return;
+      }
+      const { latitude, longitude } = coords[step];
+      database().ref(`/drivers/${SIM_DRIVER_ID}/location`).set({
+        lat: latitude, lng: longitude, timestamp: Date.now(),
+      }).catch(() => {});
+    }, 900);
+
+    return () => {
+      if (simIntervalRef.current) {
+        clearInterval(simIntervalRef.current);
+        simIntervalRef.current = null;
+      }
+    };
+  }, [trip?.status, tripId, trip?.polyline, trip?.destination]);
+
+  // ── Fit map to show origin + driver ────────────────────────────────────────
+  const handleMapReady = useCallback(() => {
+    if (!mapRef.current || !trip) return;
+    const coords = [];
+    if (trip.origin?.lat != null) {
+      coords.push({ latitude: trip.origin.lat, longitude: trip.origin.lng });
+    }
+    if (driverLocation) coords.push(driverLocation);
+    if (coords.length >= 2) {
+      mapRef.current.fitToCoordinates(coords, {
+        edgePadding: { top: 80, right: 60, bottom: 300, left: 60 },
+        animated: true,
+      });
+    }
+  }, [trip, driverLocation]);
+
+  // ── Auto-fit map when driver location changes ──────────────────────────────
+  useEffect(() => {
+    if (!driverLocation || !mapRef.current) return;
+    mapRef.current.animateToRegion({
+      latitude:      driverLocation.latitude,
+      longitude:     driverLocation.longitude,
+      latitudeDelta:  0.015,
+      longitudeDelta: 0.015,
+    }, 800);
+  }, [driverLocation]);
+
+  // ── Load saved cards when trip completes ───────────────────────────────────
   useEffect(() => {
     if (trip?.status === 'completed' && trip?.paymentMethod === 'card' && !payDone) {
       paymentApi.listCards()
@@ -83,23 +257,6 @@ export default function FollowTravelScreen({ route, navigation }) {
     }
   }, [trip?.status, trip?.paymentMethod, payDone]);
 
-  // Fit map to show both origin and driver when assigned
-  const handleMapReady = useCallback(() => {
-    if (!mapRef.current || !trip) return;
-    const coords = [];
-    if (trip.origin?.location?.coordinates) {
-      const [lng, lat] = trip.origin.location.coordinates;
-      coords.push({ latitude: lat, longitude: lng });
-    }
-    if (driverLocation) coords.push(driverLocation);
-    if (coords.length >= 2) {
-      mapRef.current.fitToCoordinates(coords, {
-        edgePadding: { top: 80, right: 60, bottom: 300, left: 60 },
-        animated: true,
-      });
-    }
-  }, [trip, driverLocation]);
-
   const handleCancel = () => {
     Alert.alert(
       'Cancelar viaje',
@@ -111,7 +268,7 @@ export default function FollowTravelScreen({ route, navigation }) {
           style: 'destructive',
           onPress: async () => {
             setCancelling(true);
-            try { await tripApi.cancel(tripId); } catch { /* already cancelled */ }
+            try { await tripApi.cancel(tripId); } catch { }
             setCancelling(false);
             dispatch(clearTrip());
             navigation.goBack();
@@ -121,7 +278,7 @@ export default function FollowTravelScreen({ route, navigation }) {
     );
   };
 
-  // Pay with saved card via confirmPayment
+  // Pay with a saved card
   const handlePayWithCard = async () => {
     if (!selectedCardId) return;
     setPaying(true);
@@ -129,15 +286,13 @@ export default function FollowTravelScreen({ route, navigation }) {
     try {
       const res = await paymentApi.createIntent(tripId, selectedCardId);
       const { clientSecret } = res.data;
-
       const { error: stripeErr } = await confirmPayment(clientSecret, {
         paymentMethodType: 'Card',
         paymentMethodData: { paymentMethodId: selectedCardId },
       });
       if (stripeErr) throw new Error(stripeErr.message);
-
       setPayDone(true);
-      setRating(true); // jump to rating
+      setRating(true);
     } catch (err) {
       setPayError(err.message ?? 'No se pudo procesar el pago. Intenta de nuevo.');
     } finally {
@@ -145,14 +300,13 @@ export default function FollowTravelScreen({ route, navigation }) {
     }
   };
 
-  // Pay by presenting Stripe PaymentSheet (enter new card or skip saved)
+  // Pay via Stripe PaymentSheet (new card)
   const handlePayWithSheet = async () => {
     setPaying(true);
     setPayError('');
     try {
       const res = await paymentApi.createIntent(tripId);
       const { clientSecret } = res.data;
-
       const { error: initErr } = await initPaymentSheet({
         paymentIntentClientSecret: clientSecret,
         merchantDisplayName:       'UberApp',
@@ -162,12 +316,9 @@ export default function FollowTravelScreen({ route, navigation }) {
 
       const { error: presentErr } = await presentPaymentSheet();
       if (presentErr) {
-        if (presentErr.code !== 'Canceled') {
-          setPayError('No se completó el pago. Intenta de nuevo.');
-        }
+        if (presentErr.code !== 'Canceled') setPayError('No se completó el pago. Intenta de nuevo.');
         return;
       }
-
       setPayDone(true);
       setRating(true);
     } catch (err) {
@@ -179,9 +330,7 @@ export default function FollowTravelScreen({ route, navigation }) {
 
   const handleRate = async (stars) => {
     setRatingLoading(true);
-    try {
-      await tripApi.rate(tripId, stars);
-    } catch { /* ignore */ }
+    try { await tripApi.rate(tripId, stars); } catch { }
     setRatingLoading(false);
     dispatch(clearTrip());
     navigation.goBack();
@@ -211,15 +360,13 @@ export default function FollowTravelScreen({ route, navigation }) {
   }
 
   const { status, origin, destination, fare, driver, paymentMethod } = trip;
-  const isTerminal = status === 'completed' || status === 'cancelled';
+  const isTerminal   = status === 'completed' || status === 'cancelled';
   const needsPayment = status === 'completed' && paymentMethod === 'card' && !payDone;
 
-  const originCoords = origin?.location?.coordinates
-    ? { latitude: origin.location.coordinates[1], longitude: origin.location.coordinates[0] }
-    : null;
-  const destCoords = destination?.location?.coordinates
-    ? { latitude: destination.location.coordinates[1], longitude: destination.location.coordinates[0] }
-    : null;
+  const originCoords = origin?.lat != null
+    ? { latitude: origin.lat, longitude: origin.lng } : null;
+  const destCoords = destination?.lat != null
+    ? { latitude: destination.lat, longitude: destination.lng } : null;
   const mapRegion = originCoords
     ? { ...originCoords, latitudeDelta: 0.02, longitudeDelta: 0.02 }
     : { latitude: 4.711, longitude: -74.0721, latitudeDelta: 0.05, longitudeDelta: 0.05 };
@@ -237,25 +384,44 @@ export default function FollowTravelScreen({ route, navigation }) {
           style={StyleSheet.absoluteFill}
           initialRegion={mapRegion}
           onMapReady={handleMapReady}
-          showsUserLocation
+          showsUserLocation={false}
           showsMyLocationButton={false}
         >
+          {/* Route polyline */}
+          {routeCoords.length > 0 && (
+            <Polyline
+              coordinates={routeCoords}
+              strokeColor={COLORS.primary}
+              strokeWidth={4}
+              lineDashPattern={[0]}
+            />
+          )}
+
+          {/* Origin marker */}
           {originCoords && (
             <Marker coordinate={originCoords} title="Origen">
               <View style={styles.markerOrigin}>
-                <Icon name="radio-button-on" size={18} color={COLORS.white} />
+                <Icon name="radio-button-on" size={16} color={COLORS.white} />
               </View>
             </Marker>
           )}
+
+          {/* Destination marker */}
           {destCoords && (
             <Marker coordinate={destCoords} title="Destino">
               <View style={styles.markerDest}>
-                <Icon name="location" size={18} color={COLORS.white} />
+                <Icon name="location" size={16} color={COLORS.white} />
               </View>
             </Marker>
           )}
+
+          {/* Driver marker (animated via Realtime DB updates) */}
           {driverLocation && (
-            <Marker coordinate={driverLocation} title="Conductor">
+            <Marker
+              coordinate={driverLocation}
+              title={driver?.fullName ?? 'Conductor'}
+              anchor={{ x: 0.5, y: 0.5 }}
+            >
               <View style={styles.markerDriver}>
                 <Icon name="car" size={18} color={COLORS.white} />
               </View>
@@ -301,7 +467,7 @@ export default function FollowTravelScreen({ route, navigation }) {
             </View>
           )}
 
-          {/* Addresses */}
+          {/* Origin / Destination addresses */}
           <View style={styles.addressBlock}>
             <View style={styles.addressRow}>
               <Icon name="radio-button-on" size={14} color={COLORS.primary} />
@@ -321,9 +487,7 @@ export default function FollowTravelScreen({ route, navigation }) {
                 <Text style={styles.payTitle}>Pagar {formatCOP(fare)}</Text>
               </View>
 
-              {payError ? (
-                <Text style={styles.payError}>{payError}</Text>
-              ) : null}
+              {payError ? <Text style={styles.payError}>{payError}</Text> : null}
 
               {/* Saved cards */}
               {savedCards.length > 0 && (
@@ -342,7 +506,6 @@ export default function FollowTravelScreen({ route, navigation }) {
                       {selectedCardId === card.id && <Icon name="checkmark" size={16} color={COLORS.white} />}
                     </TouchableOpacity>
                   ))}
-
                   <TouchableOpacity
                     style={[styles.primaryBtn, paying && styles.btnDisabled]}
                     onPress={handlePayWithCard}
@@ -356,38 +519,42 @@ export default function FollowTravelScreen({ route, navigation }) {
                         </>
                     }
                   </TouchableOpacity>
-
                   <TouchableOpacity style={styles.altPayBtn} onPress={handlePayWithSheet} disabled={paying}>
                     <Text style={styles.altPayText}>Usar otra tarjeta</Text>
                   </TouchableOpacity>
                 </>
               )}
 
-              {/* No saved cards — go straight to PaymentSheet */}
+              {/* No saved cards */}
               {savedCards.length === 0 && (
-                <TouchableOpacity
-                  style={[styles.primaryBtn, paying && styles.btnDisabled]}
-                  onPress={handlePayWithSheet}
-                  disabled={paying}
-                >
-                  {paying
-                    ? <ActivityIndicator color={COLORS.white} size="small" />
-                    : <>
-                        <Icon name="card-outline" size={18} color={COLORS.white} />
-                        <Text style={styles.primaryBtnText}>Ingresar tarjeta</Text>
-                      </>
-                  }
-                </TouchableOpacity>
+                <>
+                  <View style={styles.testCardHint}>
+                    <Icon name="information-circle-outline" size={14} color="#666" />
+                    <Text style={styles.testCardText}>
+                      Modo prueba · Tarjeta: 4242 4242 4242 4242 · Cualquier fecha futura · CVC: 123
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.primaryBtn, paying && styles.btnDisabled]}
+                    onPress={handlePayWithSheet}
+                    disabled={paying}
+                  >
+                    {paying
+                      ? <ActivityIndicator color={COLORS.white} size="small" />
+                      : <>
+                          <Icon name="card-outline" size={18} color={COLORS.white} />
+                          <Text style={styles.primaryBtnText}>Ingresar tarjeta de pago</Text>
+                        </>
+                    }
+                  </TouchableOpacity>
+                </>
               )}
             </View>
           )}
 
           {/* ── Completed (cash or after payment) ── */}
           {status === 'completed' && !needsPayment && (
-            <TouchableOpacity
-              style={styles.primaryBtn}
-              onPress={() => setRating(true)}
-            >
+            <TouchableOpacity style={styles.primaryBtn} onPress={() => setRating(true)}>
               <Icon name="star-outline" size={18} color={COLORS.white} />
               <Text style={styles.primaryBtnText}>Calificar conductor</Text>
             </TouchableOpacity>
@@ -474,12 +641,18 @@ const styles = StyleSheet.create({
   addressRow:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
   addressText:  { flex: 1, fontSize: FONT.sm, color: COLORS.dark },
 
-  // Payment block
   payBlock:  { marginBottom: SPACING.xs },
   payHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: SPACING.sm },
   payTitle:  { fontSize: FONT.md, fontWeight: '800', color: COLORS.dark },
   payLabel:  { fontSize: FONT.sm, color: COLORS.gray, marginBottom: 8 },
   payError:  { fontSize: FONT.sm, color: COLORS.danger, marginBottom: 8 },
+
+  testCardHint: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 6,
+    backgroundColor: '#FFF8E1', borderRadius: 8,
+    padding: 10, marginBottom: 10,
+  },
+  testCardText: { flex: 1, fontSize: 11, color: '#666', lineHeight: 16 },
 
   cardOption: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -517,7 +690,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.danger, alignItems: 'center', justifyContent: 'center',
   },
   markerDriver: {
-    width: 36, height: 36, borderRadius: 18,
+    width: 38, height: 38, borderRadius: 19,
     backgroundColor: '#1C1C1E', alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: COLORS.white,
+    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 4, elevation: 6,
   },
 });

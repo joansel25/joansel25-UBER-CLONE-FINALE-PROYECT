@@ -80,3 +80,9 @@ yarn-error.log
 # Environment variables — never commit real keys
 .env
 .env.local
+
+# Archivos de log — solo para depuración local
+*.log
+logs/
+debug-*.txt
+metro-*.log
