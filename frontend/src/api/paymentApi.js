@@ -81,7 +81,7 @@ const paymentApi = {
       uid,
     );
 
-    // Registrar transacción pendiente en Firestore
+    // Record pending transaction in Firestore
     await txCol().add({
       tripId,
       passengerId:   uid,
@@ -103,7 +103,7 @@ const paymentApi = {
     };
   },
 
-  // ── Transacción por viaje ─────────────────────────────────────────────────
+  // ── Transaction by trip ──────────────────────────────────────────────────
   getByTrip: async (tripId) => {
     const snap = await txCol().where('tripId', '==', tripId).limit(1).get();
     if (snap.empty) throw Object.assign(new Error('No transaction found'), { statusCode: 404 });

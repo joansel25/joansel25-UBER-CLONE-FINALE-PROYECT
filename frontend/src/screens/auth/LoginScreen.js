@@ -43,11 +43,11 @@ export default function LoginScreen({ navigation }) {
     logger.step('Login', `Intentando login: ${normalizedEmail}`);
     try {
       await signIn(normalizedEmail, password);
-      logger.ok('Login', 'Firebase auth OK — esperando AuthContext…');
-      // onAuthStateChanged toma el control desde aquí
+      logger.ok('Login', 'Firebase auth OK — waiting for AuthContext…');
+      // onAuthStateChanged takes over from here
     } catch (err) {
-      logger.error('Login', `Falló — code:${err.code} | message:${err.message}`);
-      setDebugCode(err.code ?? 'sin_código');
+      logger.error('Login', `Failed — code:${err.code} | message:${err.message}`);
+      setDebugCode(err.code ?? 'no_code');
       setError(friendlyMessage(err.code));
     } finally {
       setLoading(false);
@@ -62,7 +62,7 @@ export default function LoginScreen({ navigation }) {
     }
 
     setResetting(true);
-    logger.step('Login', `Enviando reset de contraseña a: ${emailToReset}`);
+    logger.step('Login', `Sending password reset to: ${emailToReset}`);
     try {
       await resetPassword(emailToReset);
       logger.ok('Login', 'Email de reset enviado');
@@ -72,7 +72,7 @@ export default function LoginScreen({ navigation }) {
         [{ text: 'Entendido', style: 'default' }]
       );
     } catch (err) {
-      logger.error('Login', `Reset falló — code:${err.code} | ${err.message}`);
+      logger.error('Login', `Reset failed — code:${err.code} | ${err.message}`);
       if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-email') {
         setError('No existe ninguna cuenta con ese correo.');
       } else {
@@ -165,7 +165,7 @@ export default function LoginScreen({ navigation }) {
               </View>
             </View>
 
-            {/* Olvidé mi contraseña */}
+            {/* Forgot password */}
             <TouchableOpacity
               style={styles.forgotBtn}
               onPress={handleForgotPassword}

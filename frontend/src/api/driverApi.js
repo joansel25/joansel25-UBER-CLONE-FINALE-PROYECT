@@ -72,7 +72,7 @@ const driverApi = {
     return { data: docToDriver(doc) };
   },
 
-  // ── Publicar ubicación en Realtime Database ───────────────────────────────
+  // ── Publish driver location to Realtime Database ─────────────────────────
   updateLocation: async (lat, lng, tripId = null) => {
     const uid     = getAuth().currentUser?.uid;
     const payload = { lat, lng, timestamp: Date.now() };

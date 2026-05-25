@@ -31,19 +31,19 @@ export default function AppNavigator() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!firebaseUser ? (
-          // Sin sesión → flujo de login / registro
+          // No session → login / register flow
           <Stack.Screen name="Auth" component={AuthNavigator} />
 
         ) : profileStatus === 'not_found' ? (
-          // Cuenta Firebase existe pero SIN perfil Firestore → completar registro
+          // Firebase account exists but NO Firestore profile → complete registration
           <Stack.Screen name="Register" component={RegisterScreen} />
 
         ) : !dbUser ? (
-          // profileStatus === 'loading' aún en vuelo → mostrar loader
+          // profileStatus === 'loading' still in-flight → show loader
           <Stack.Screen name="ProfileLoading" component={ProfileLoadingScreen} />
 
         ) : isDriver ? (
-          // App del conductor
+          // Driver app
           <>
             <Stack.Screen name="DriverMain"     component={DriverTabNavigator} />
             <Stack.Screen name="TripDetail"     component={TripDetailScreen} />
@@ -52,7 +52,7 @@ export default function AppNavigator() {
           </>
 
         ) : (
-          // App del pasajero
+          // Passenger app
           <>
             <Stack.Screen name="Main"           component={TabNavigator} />
             <Stack.Screen name="FollowTravel"   component={FollowTravelScreen} />

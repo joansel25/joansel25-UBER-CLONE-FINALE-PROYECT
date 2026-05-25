@@ -93,15 +93,15 @@ export default function RegisterScreen({ navigation }) {
     try {
       let uid, email;
 
-      logger.step('Register', isCompletingProfile ? 'Modo: completar perfil existente' : 'Modo: registro completo');
+      logger.step('Register', isCompletingProfile ? 'Mode: complete existing profile' : 'Mode: full registration');
 
       if (isCompletingProfile) {
         uid   = firebaseUser.uid;
         email = firebaseUser.email;
-        logger.info('Register', `Reutilizando cuenta Firebase: ${email}`);
+        logger.info('Register', `Reusing Firebase account: ${email}`);
       } else {
         setStep('Creando cuenta en Firebase...');
-        logger.step('Register', `Paso 1 — Creando cuenta Firebase: ${form.email.trim()}`);
+        logger.step('Register', `Step 1 — Creating Firebase account: ${form.email.trim()}`);
         const credential = await createUserWithEmailAndPassword(
           getAuth(),
           form.email.trim().toLowerCase(),
@@ -110,11 +110,11 @@ export default function RegisterScreen({ navigation }) {
         uid   = credential.user.uid;
         email = form.email.trim().toLowerCase();
         firebaseCreatedHere = true;
-        logger.ok('Register', `Paso 1 ✓ Firebase UID: ${uid.slice(0, 8)}…`);
+        logger.ok('Register', `Step 1 ✓ Firebase UID: ${uid.slice(0, 8)}…`);
       }
 
       setStep('Guardando tu perfil...');
-      logger.step('Register', 'Paso 2 — Guardando perfil en Firestore…');
+      logger.step('Register', 'Step 2 — Saving profile to Firestore…');
       const registered = await userApi.register({
         fullName:    form.fullName.trim(),
         email,
@@ -125,29 +125,29 @@ export default function RegisterScreen({ navigation }) {
         role:        'passenger',
       });
       registerSucceeded = true;
-      logger.ok('Register', 'Paso 2 ✓ Perfil guardado en Firestore');
+      logger.ok('Register', 'Step 2 ✓ Profile saved to Firestore');
 
       setStep('Entrando a la app...');
-      logger.step('Register', 'Paso 3 — Activando sesión en contexto…');
+      logger.step('Register', 'Step 3 — activating session in context…');
       // Set user directly from what we just wrote — no extra Firestore GET needed
       await forceUserFound(registered.data);
-      logger.ok('Register', 'Paso 3 ✓ Registro completo — redirigiendo a la app');
+      logger.ok('Register', 'Step 3 ✓ Registration complete — redirecting to app');
 
     } catch (err) {
-      logger.error('Register', `Error — code:${err.code ?? 'sin código'} | statusCode:${err.statusCode ?? 'n/a'} | ${err.message}`);
+      logger.error('Register', `Error — code:${err.code ?? 'no code'} | statusCode:${err.statusCode ?? 'n/a'} | ${err.message}`);
 
-      // Email ya existe en Firebase → intentar iniciar sesión automáticamente
+      // Email already registered in Firebase → attempt auto-login with same password
       if (err.code === 'auth/email-already-in-use') {
-        logger.info('Register', 'Email ya registrado en Firebase — intentando auto-login con misma contraseña...');
+        logger.info('Register', 'Email already in Firebase — attempting auto-login with same password...');
         try {
           await signIn(form.email.trim().toLowerCase(), form.password);
-          logger.ok('Register', 'Auto-login exitoso — onAuthStateChanged detectará el perfil');
-          // onAuthStateChanged se encarga: si hay perfil Firestore → app principal
-          // si no hay perfil Firestore (profileStatus = not_found) → RegisterScreen (completar perfil)
+          logger.ok('Register', 'Auto-login successful — onAuthStateChanged will detect the profile');
+          // onAuthStateChanged handles: Firestore profile exists → main app
+          // no Firestore profile (profileStatus = not_found) → RegisterScreen (complete profile)
           return;
         } catch (signInErr) {
-          logger.warn('Register', `Auto-login fallido — code:${signInErr.code} | ${signInErr.message}`);
-          // Contraseña diferente a la del intento anterior — pedir que vaya a login
+          logger.warn('Register', `Auto-login failed — code:${signInErr.code} | ${signInErr.message}`);
+          // Different password from prior attempt — send user to login screen
           setGlobalError(
             'Ya existe una cuenta con ese correo pero con otra contraseña. ' +
             'Ve a "Iniciar sesión" y usa tu contraseña anterior. ' +
@@ -157,7 +157,7 @@ export default function RegisterScreen({ navigation }) {
         }
       }
 
-      // Error al guardar en Firestore → rollback solo si fue error de servidor
+      // Firestore write failed → rollback only on server/network errors
       if (firebaseCreatedHere && !registerSucceeded) {
         const isFirebaseError   = err.code?.startsWith('auth/');
         const isValidationError = err.statusCode === 400 || err.statusCode === 409;
@@ -166,14 +166,14 @@ export default function RegisterScreen({ navigation }) {
         const isPermissionError = err.isPermissionError || err.statusCode === 403;
 
         if (!isFirebaseError && !isValidationError && !isPermissionError) {
-          logger.warn('Register', 'Error de red/servidor — haciendo rollback de cuenta Firebase…');
+          logger.warn('Register', 'Network/server error — rolling back Firebase account…');
           const fbUser = getAuth().currentUser;
           if (fbUser) {
             try {
               await deleteUser(fbUser);
-              logger.ok('Register', 'Rollback completado — cuenta Firebase eliminada');
+              logger.ok('Register', 'Rollback complete — Firebase account deleted');
             } catch (rollbackErr) {
-              logger.error('Register', `Rollback falló: ${rollbackErr.message} — usuario Firebase puede quedar huérfano`);
+              logger.error('Register', `Rollback failed: ${rollbackErr.message} — Firebase user may be orphaned`);
             }
           }
         }
@@ -489,7 +489,7 @@ function Field({ label, error, hint, required, children }) {
   );
 }
 
-// ── Firebase / Network → mensajes amigables en español ────────────────────
+// ── Firebase / Network → user-friendly messages (Spanish UI, English code) ──
 function friendlyMessage(code, fallback, statusCode) {
   const map = {
     'auth/email-already-in-use':

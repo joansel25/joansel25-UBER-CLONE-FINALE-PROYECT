@@ -39,7 +39,7 @@ export default function ConnectionErrorScreen() {
           Tu sesión de Firebase está activa, pero no se puede alcanzar el servidor backend.
         </Text>
 
-        {/* Debug info — visible siempre para facilitar diagnóstico */}
+        {/* Debug info — always visible to aid diagnosis */}
         <View style={styles.debugBox}>
           <Text style={styles.debugLabel}>API_URL configurada:</Text>
           <Text style={styles.debugValue}>{apiUrl}</Text>

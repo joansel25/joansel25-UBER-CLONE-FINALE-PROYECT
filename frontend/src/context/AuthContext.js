@@ -14,9 +14,9 @@ const AuthContext = createContext(null);
 const USER_KEY    = '@uber_user';
 
 // profileStatus:
-//   'loading'   — verificando perfil en Firestore
-//   'found'     — perfil existe en Firestore
-//   'not_found' — usuario Firebase SIN perfil Firestore → completar registro
+//   'loading'   — verifying profile in Firestore
+//   'found'     — profile exists in Firestore
+//   'not_found' — Firebase user with NO Firestore profile → complete registration
 export function AuthProvider({ children }) {
   const [firebaseUser,      setFirebaseUser]      = useState(null);
   const [dbUser,            setDbUser]            = useState(null);
@@ -39,40 +39,40 @@ export function AuthProvider({ children }) {
       if (fbUser) {
         setProfileStatus('loading');
 
-        // Cargar caché mientras se consulta Firestore
+        // Load cache while Firestore is queried
         try {
           const cached = await AsyncStorage.getItem(USER_KEY);
           if (cached) setDbUser(JSON.parse(cached));
-        } catch { /* ignora cache corrupta */ }
+        } catch { /* ignore corrupted cache */ }
 
         try {
-          logger.step('Auth', 'Cargando perfil desde Firestore…');
+          logger.step('Auth', 'Loading profile from Firestore…');
           const { data } = await userApi.getMe();
-          logger.ok('Auth', `Perfil encontrado — role:${data.role}`);
+          logger.ok('Auth', `Profile found — role:${data.role}`);
           setDbUser(data);
           setProfileStatus('found');
           await AsyncStorage.setItem(USER_KEY, JSON.stringify(data));
         } catch (err) {
           if (err.statusCode === 404) {
             if (isRegisteringRef.current) {
-              // Registro en curso → mantener 'loading' hasta que refreshUser lo confirme
+              // Registration in progress → keep 'loading' until refreshUser confirms
               setProfileStatus('loading');
             } else {
-              logger.info('Auth', 'Sin perfil Firestore → completar registro');
+              logger.info('Auth', 'No Firestore profile → complete registration');
               setDbUser(null);
               setProfileStatus('not_found');
               await AsyncStorage.removeItem(USER_KEY);
             }
           } else {
-            logger.error('Auth', `Error al cargar perfil: ${err.message}`);
-            // Error inesperado → limpiar caché y pedir al usuario que registre
+            logger.error('Auth', `Error loading profile: ${err.message}`);
+            // Unexpected error → clear cache and prompt user to register
             setDbUser(null);
             setProfileStatus('not_found');
             await AsyncStorage.removeItem(USER_KEY);
           }
         }
       } else {
-        logger.info('Auth', 'Sin sesión Firebase — limpiando estado');
+        logger.info('Auth', 'No Firebase session — clearing state');
         setDbUser(null);
         setProfileStatus('loading');
         await AsyncStorage.removeItem(USER_KEY);
