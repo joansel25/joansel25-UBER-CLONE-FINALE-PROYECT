@@ -50,8 +50,10 @@ export default function RegisterProfileScreen({ navigation }) {
     }
   }, [dbUser]);
 
-  const updateFormData = (key, value) =>
+  const updateFormData = (key, value) => {
     setFormData(prev => ({ ...prev, [key]: value }));
+    if (key === 'language') updateDbUser({ language: value });
+  };
 
   // Called by each tab's save button with only the fields it owns
   const handleSave = async (updates) => {

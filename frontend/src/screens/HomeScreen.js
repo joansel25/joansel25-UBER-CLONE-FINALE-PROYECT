@@ -20,7 +20,7 @@ import { formatCOP }   from '../utils/formatters';
 import { COLORS, RADIUS, FONT, SPACING, SHADOW } from '../constants/theme';
 import { useTranslation } from '../hooks/useTranslation';
 import driverApi from '../api/driverApi';
-import { seedSimulatedDrivers } from '../utils/seedDrivers';
+import { seedSimulatedDrivers, DRIVER_PROFILES, OFFSETS } from '../utils/seedDrivers';
 
 const MAX_FARE       = 50000;
 const DEBOUNCE_MS    = 400;
@@ -70,6 +70,7 @@ export default function HomeScreen({ navigation }) {
   const [gettingGPS,       setGettingGPS]       = useState(false);
   const [nearbyDrivers,    setNearbyDrivers]    = useState([]);
   const [driverPositions,  setDriverPositions]  = useState({}); // { driverId: { lat, lng } }
+  const [selectedDriverId, setSelectedDriverId] = useState(null);
 
   const intervalRef    = useRef(null);
   const userLocRef     = useRef(null);
@@ -78,19 +79,31 @@ export default function HomeScreen({ navigation }) {
   // Keep latest user location accessible in movement interval without re-creating it
   useEffect(() => { userLocRef.current = location; }, [location]);
 
-  // Seed/load drivers once user location is known; position them around the user
+  // Build drivers locally from DRIVER_PROFILES as soon as GPS is known.
+  // This guarantees the simulation always runs regardless of Firestore availability.
+  // Firestore seeding runs in background for persistence only.
   useEffect(() => {
     if (!location || driversSeeded.current) return;
     driversSeeded.current = true;
-    let cancelled = false;
-    (async () => {
-      try {
-        await seedSimulatedDrivers(location.latitude, location.longitude);
-        const { data } = await driverApi.getNearby();
-        if (!cancelled) setNearbyDrivers(data);
-      } catch { /* map still works without drivers */ }
-    })();
-    return () => { cancelled = true; };
+
+    const localDrivers = DRIVER_PROFILES.map((d, i) => ({
+      _id: d.id,
+      id:  d.id,
+      fullName:      d.fullName,
+      vehicleInfo:   d.vehicle,
+      rating:        d.rating,
+      licenseNumber: d.licenseNumber,
+      status:        'available',
+      isSimulated:   true,
+      currentLocation: {
+        lat: location.latitude  + OFFSETS[i].dlat,
+        lng: location.longitude + OFFSETS[i].dlng,
+      },
+    }));
+    setNearbyDrivers(localDrivers);
+
+    // Persist to Firestore in background (best effort — not required for the simulation)
+    seedSimulatedDrivers(location.latitude, location.longitude).catch(() => {});
   }, [location]);
 
   // Start movement simulation once drivers are loaded
@@ -229,6 +242,24 @@ export default function HomeScreen({ navigation }) {
     return { nearestDriver: driver, nearestDistKm: bestDist.toFixed(1) };
   }, [originPlace, driverPositions, nearbyDrivers]);
 
+  // ── Featured driver: explicitly selected or auto-nearest ────────────────────
+  const featuredDriver = useMemo(() => {
+    if (selectedDriverId) return nearbyDrivers.find(d => d._id === selectedDriverId) ?? nearestDriver;
+    return nearestDriver;
+  }, [selectedDriverId, nearbyDrivers, nearestDriver]);
+
+  const featuredDriverDist = useMemo(() => {
+    if (!featuredDriver) return null;
+    if (!selectedDriverId) return nearestDistKm; // already computed by nearestDriver memo
+    const pos = driverPositions[featuredDriver._id];
+    if (!pos) return null;
+    const ref = originPlace ?? (userLocRef.current
+      ? { lat: userLocRef.current.latitude, lng: userLocRef.current.longitude }
+      : null);
+    if (!ref) return null;
+    return haversineKm(ref.lat, ref.lng, pos.lat, pos.lng).toFixed(1);
+  }, [featuredDriver, selectedDriverId, nearestDistKm, driverPositions, originPlace]);
+
   // ── Select autocomplete suggestion ───────────────────────────────────────────
   const handleSelectSuggestion = async (suggestion) => {
     setSuggestions([]);
@@ -366,23 +397,30 @@ export default function HomeScreen({ navigation }) {
             pinColor={COLORS.danger}
           />
         )}
-        {/* Nearby driver markers — positions update every 2s from driverPositions state */}
+        {/* Nearby driver markers — positions update every 2s; tap to select */}
         {nearbyDrivers.map(driver => {
           const pos = driverPositions[driver._id];
           if (!pos) return null;
-          const isNearest = nearestDriver?._id === driver._id;
+          const isNearest    = !selectedDriverId && nearestDriver?._id === driver._id;
+          const isSelected   = selectedDriverId === driver._id;
+          const isHighlighted = isSelected || isNearest;
           return (
             <Marker
               key={driver._id}
               coordinate={{ latitude: pos.lat, longitude: pos.lng }}
               anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={isNearest}
+              tracksViewChanges={isHighlighted}
+              onPress={() => setSelectedDriverId(prev => prev === driver._id ? null : driver._id)}
             >
-              <View style={[styles.driverMarker, isNearest && styles.driverMarkerNearest]}>
+              <View style={[
+                styles.driverMarker,
+                isHighlighted && styles.driverMarkerNearest,
+                isSelected    && styles.driverMarkerSelected,
+              ]}>
                 <Icon
                   name="car"
-                  size={isNearest ? 16 : 13}
-                  color={isNearest ? COLORS.white : COLORS.primary}
+                  size={isHighlighted ? 16 : 13}
+                  color={isHighlighted ? COLORS.white : COLORS.primary}
                 />
               </View>
             </Marker>
@@ -475,22 +513,63 @@ export default function HomeScreen({ navigation }) {
             {t('home_greeting', dbUser?.fullName?.split(' ')[0] ?? t('home_traveler'))}
           </Text>
 
-          {/* Drivers available + nearest driver info */}
+          {/* Drivers available count + featured driver card */}
           {nearbyDrivers.length > 0 && step === STEP.IDLE && (
-            <View style={styles.driversRow}>
-              <View style={styles.driversAvailableChip}>
-                <View style={styles.driversDot} />
-                <Text style={styles.driversAvailableText}>
-                  {t('home_drivers_available', nearbyDrivers.length)}
-                </Text>
-              </View>
-              {nearestDriver && nearestDistKm && (
-                <View style={styles.nearestDriverChip}>
-                  <Icon name="navigate" size={11} color={COLORS.primary} />
-                  <Text style={styles.nearestDriverText}>
-                    {t('home_nearest_driver')} · {t('home_driver_km_away', nearestDistKm)}
+            <View style={styles.driversSection}>
+              {/* Count chip */}
+              <View style={styles.driversRow}>
+                <View style={styles.driversAvailableChip}>
+                  <View style={styles.driversDot} />
+                  <Text style={styles.driversAvailableText}>
+                    {t('home_drivers_available', nearbyDrivers.length)}
                   </Text>
                 </View>
+                {!featuredDriver && (
+                  <Text style={styles.tapHintText}>{t('home_tap_driver_hint')}</Text>
+                )}
+              </View>
+
+              {/* Featured driver card */}
+              {featuredDriver && (
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={styles.driverCard}
+                  onPress={() => selectedDriverId && setSelectedDriverId(null)}
+                >
+                  <View style={styles.driverCardAvatar}>
+                    <Icon name="person" size={18} color={COLORS.white} />
+                  </View>
+
+                  <View style={styles.driverCardBody}>
+                    <Text style={styles.driverCardName}>{featuredDriver.fullName}</Text>
+                    <Text style={styles.driverCardCar}>
+                      {featuredDriver.vehicleInfo?.make} {featuredDriver.vehicleInfo?.model} {featuredDriver.vehicleInfo?.year}
+                    </Text>
+                    <Text style={styles.driverCardPlate}>
+                      {featuredDriver.vehicleInfo?.color} · {featuredDriver.vehicleInfo?.plate}
+                    </Text>
+                  </View>
+
+                  <View style={styles.driverCardRight}>
+                    <View style={styles.driverCardRatingRow}>
+                      <Icon name="star" size={11} color="#FF9500" />
+                      <Text style={styles.driverCardRating}>{featuredDriver.rating}</Text>
+                    </View>
+                    {featuredDriverDist != null && (
+                      <>
+                        <Text style={styles.driverCardDist}>{featuredDriverDist} km</Text>
+                        <Text style={styles.driverCardEta}>
+                          {t('home_driver_eta', Math.max(1, Math.round(Number(featuredDriverDist) * 3)))}
+                        </Text>
+                      </>
+                    )}
+                    <View style={[styles.driverBadge, selectedDriverId ? styles.driverBadgeSelected : styles.driverBadgeNearest]}>
+                      <Text style={styles.driverBadgeText}>
+                        {selectedDriverId ? t('home_driver_selected') : t('home_nearest_driver')}
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
               )}
             </View>
           )}
@@ -758,11 +837,18 @@ const styles = StyleSheet.create({
     width: 42, height: 42, borderRadius: 21,
     shadowOpacity: 0.3,
   },
+  driverMarkerSelected: {
+    backgroundColor: COLORS.success,
+    borderColor: COLORS.success,
+    width: 44, height: 44, borderRadius: 22,
+    shadowOpacity: 0.4,
+  },
 
-  // Drivers available chips in bottom panel
+  // Drivers section in bottom panel
+  driversSection: { marginBottom: SPACING.sm },
   driversRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    marginBottom: SPACING.sm, flexWrap: 'wrap',
+    marginBottom: 8, flexWrap: 'wrap',
   },
   driversAvailableChip: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
@@ -775,11 +861,35 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.success,
   },
   driversAvailableText: { fontSize: 11, color: '#2d7a44', fontWeight: '600' },
-  nearestDriverChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: '#EEF5FF', borderRadius: 20,
-    paddingVertical: 4, paddingHorizontal: 10,
-    borderWidth: 1, borderColor: '#B8D4FF',
+  tapHintText: { fontSize: 11, color: COLORS.gray, flex: 1 },
+
+  // Featured driver card
+  driverCard: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#F8FAFF',
+    borderRadius: 12, padding: 10,
+    borderWidth: 1, borderColor: '#D0E4FF',
+    gap: 10,
+    ...SHADOW.card,
   },
-  nearestDriverText: { fontSize: 11, color: COLORS.primary, fontWeight: '600' },
+  driverCardAvatar: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  driverCardBody: { flex: 1 },
+  driverCardName: { fontSize: FONT.base, fontWeight: '700', color: COLORS.dark },
+  driverCardCar:  { fontSize: FONT.sm, color: COLORS.gray, marginTop: 1 },
+  driverCardPlate: { fontSize: FONT.sm, color: COLORS.gray },
+  driverCardRight: { alignItems: 'flex-end', gap: 3 },
+  driverCardRatingRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  driverCardRating: { fontSize: FONT.sm, fontWeight: '700', color: COLORS.dark },
+  driverCardDist: { fontSize: FONT.sm, color: COLORS.primary, fontWeight: '600' },
+  driverCardEta:  { fontSize: 11, color: COLORS.gray },
+  driverBadge: {
+    borderRadius: 10, paddingVertical: 2, paddingHorizontal: 7,
+  },
+  driverBadgeNearest:  { backgroundColor: '#EEF5FF' },
+  driverBadgeSelected: { backgroundColor: '#E8F8EE' },
+  driverBadgeText: { fontSize: 10, fontWeight: '700', color: COLORS.primary },
 });

@@ -1,6 +1,6 @@
 import firestore from '@react-native-firebase/firestore';
 
-const DRIVER_PROFILES = [
+export const DRIVER_PROFILES = [
   { id: 'sim_driver_001', fullName: 'Carlos Rodríguez', email: 'carlos.r@sim.co',
     vehicle: { make: 'Toyota',    model: 'Corolla',  year: 2020, color: 'Blanco',   plate: 'ABC-123' },
     licenseNumber: 'LIC-001', rating: 4.9 },
@@ -22,7 +22,7 @@ const DRIVER_PROFILES = [
 ];
 
 // Spread drivers around the user's actual GPS position (offsets in degrees, ~0.5–1.8 km)
-const OFFSETS = [
+export const OFFSETS = [
   { dlat:  0.007, dlng:  0.004 },
   { dlat: -0.006, dlng: -0.009 },
   { dlat:  0.012, dlng: -0.007 },
@@ -40,6 +40,7 @@ export async function seedSimulatedDrivers(centerLat, centerLng) {
 
     batch.set(firestore().collection('drivers').doc(d.id), {
       userId:          d.id,
+      fullName:        d.fullName,
       vehicleInfo:     d.vehicle,
       licenseNumber:   d.licenseNumber,
       isVerified:      true,

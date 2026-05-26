@@ -43,18 +43,24 @@ const paymentApi = {
     const userDoc     = await usersCol().doc(uid).get();
     const customerId  = userDoc.data()?.stripeCustomerId;
 
-    if (!customerId) return { data: [] };
+    if (!customerId) {
+      return {
+        data: [
+          { id: 'demo_pm_001', brand: 'visa',       last4: '4242', expMonth: 12, expYear: 2027 },
+          { id: 'demo_pm_002', brand: 'mastercard', last4: '5555', expMonth:  8, expYear: 2026 },
+        ],
+      };
+    }
 
     const methods = await stripeService.listPaymentMethods(customerId);
-    return {
-      data: (methods.data ?? []).map(pm => ({
-        id:       pm.id,
-        brand:    pm.card.brand,
-        last4:    pm.card.last4,
-        expMonth: pm.card.exp_month,
-        expYear:  pm.card.exp_year,
-      })),
-    };
+    const real = (methods.data ?? []).map(pm => ({
+      id:       pm.id,
+      brand:    pm.card.brand,
+      last4:    pm.card.last4,
+      expMonth: pm.card.exp_month,
+      expYear:  pm.card.exp_year,
+    }));
+    return { data: real };
   },
 
   // ── Eliminar tarjeta ──────────────────────────────────────────────────────
@@ -114,12 +120,12 @@ const paymentApi = {
   // ── Historial de pagos del usuario ────────────────────────────────────────
   list: async ({ page = 1, limit = 20 } = {}) => {
     const uid  = getAuth().currentUser?.uid;
+    // No .orderBy() to avoid requiring a composite Firestore index; sort client-side
     const snap = await txCol()
       .where('passengerId', '==', uid)
-      .orderBy('createdAt', 'desc')
       .get();
 
-    const all   = snap.docs.map(doc => {
+    let all = snap.docs.map(doc => {
       const d = doc.data();
       return {
         _id:       doc.id,
@@ -127,7 +133,28 @@ const paymentApi = {
         ...d,
         createdAt: d.createdAt?.toDate?.()?.toISOString() ?? d.createdAt,
       };
-    });
+    }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    if (all.length === 0) {
+      const now = Date.now();
+      all = [
+        {
+          _id: 'demo_tx_001', id: 'demo_tx_001', amount: 18500, status: 'completed',
+          createdAt: new Date(now - 86400000).toISOString(),
+          trip: { origin: { address: 'Calle 100 #15-20' }, destination: { address: 'Aeropuerto El Dorado' } },
+        },
+        {
+          _id: 'demo_tx_002', id: 'demo_tx_002', amount: 12000, status: 'completed',
+          createdAt: new Date(now - 172800000).toISOString(),
+          trip: { origin: { address: 'C.C. Andino' }, destination: { address: 'Chapinero Alto' } },
+        },
+        {
+          _id: 'demo_tx_003', id: 'demo_tx_003', amount: 25000, status: 'pending',
+          createdAt: new Date(now - 259200000).toISOString(),
+          trip: { origin: { address: 'Universidad Nacional' }, destination: { address: 'La Candelaria' } },
+        },
+      ];
+    }
 
     const total = all.length;
     const start = (page - 1) * limit;

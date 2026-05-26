@@ -3,5 +3,6 @@
     "commentTranslate.source": "auto",
     "commentTranslate.target": "es",
     "commentTranslate.engine": "google",
-    "commentTranslate.useGoogleTranslate": true
+    "commentTranslate.useGoogleTranslate": true,
+    "javascript.validate.enable": false
 }

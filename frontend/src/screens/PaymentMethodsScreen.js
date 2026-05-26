@@ -44,7 +44,10 @@ export default function PaymentMethodsScreen({ navigation }) {
   }, [t]);
 
   // Reload every time the screen comes into focus
-  useFocusEffect(loadCards);
+  // Wrapped in useCallback so useFocusEffect receives a non-async callback (no Promise returned)
+  useFocusEffect(
+    useCallback(() => { loadCards(); }, [loadCards])
+  );
 
   const handleAddCard = async () => {
     setAdding(true);

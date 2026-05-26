@@ -7,6 +7,8 @@ import Icon              from 'react-native-vector-icons/Ionicons';
 import { launchImageLibrary } from 'react-native-image-picker';
 import storage           from '@react-native-firebase/storage';
 import { useTranslation } from '../../hooks/useTranslation';
+import { useAuth }        from '../../context/AuthContext';
+import userApi            from '../../api/userApi';
 
 const GENDER_KEYS = ['male', 'female', 'other'];
 
@@ -17,6 +19,7 @@ export default function PersonalInfoTab({
   isSaving       = false,
 }) {
   const { t } = useTranslation();
+  const { updateDbUser } = useAuth();
   const [showGenderModal, setShowGenderModal] = useState(false);
   const [uploadingPhoto,  setUploadingPhoto]  = useState(false);
 
@@ -24,6 +27,7 @@ export default function PersonalInfoTab({
 
   // ── Photo selection + Firebase Storage upload ─────────────────────────────
   const handleSelectPhoto = async () => {
+    const prevPhoto = formData.photo;
     try {
       const result = await launchImageLibrary({
         mediaType:     'photo',
@@ -33,20 +37,21 @@ export default function PersonalInfoTab({
       if (result.didCancel) return;
 
       const asset = result.assets?.[0];
-      if (!asset?.base64) return;
+      if (!asset?.uri || !asset?.base64) return;
 
-      // Show local preview immediately
-      updateFormData('photo', asset.uri);
+      updateFormData('photo', asset.uri); // local preview immediately
       setUploadingPhoto(true);
 
-      // Upload via base64 to avoid content:// URI issues on Android
+      // Use base64 to avoid content:// URI resolution failures on Android
       const ref = storage().ref(`profiles/${Date.now()}.jpg`);
-      await ref.putString(asset.base64, 'base64', { contentType: 'image/jpeg' });
+      await ref.putString(asset.base64, 'base64');
       const downloadUrl = await ref.getDownloadURL();
 
-      await onSave({ profilePic: downloadUrl });
+      await userApi.updateProfile({ profilePic: downloadUrl });
+      updateDbUser({ profilePic: downloadUrl });
       updateFormData('photo', downloadUrl);
     } catch {
+      updateFormData('photo', prevPhoto); // revert preview on failure
       Alert.alert('Error', t('personal_photo_error'));
     } finally {
       setUploadingPhoto(false);
