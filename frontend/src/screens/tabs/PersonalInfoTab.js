@@ -25,18 +25,23 @@ export default function PersonalInfoTab({
   // ── Photo selection + Firebase Storage upload ─────────────────────────────
   const handleSelectPhoto = async () => {
     try {
-      const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.8 });
-      if (result.didCancel || result.errorCode) return;
+      const result = await launchImageLibrary({
+        mediaType:     'photo',
+        quality:       0.7,
+        includeBase64: true,
+      });
+      if (result.didCancel) return;
 
       const asset = result.assets?.[0];
-      if (!asset) return;
+      if (!asset?.base64) return;
 
+      // Show local preview immediately
       updateFormData('photo', asset.uri);
       setUploadingPhoto(true);
 
-      const filename = `profiles/${Date.now()}.jpg`;
-      const ref      = storage().ref(filename);
-      await ref.putFile(asset.uri);
+      // Upload via base64 to avoid content:// URI issues on Android
+      const ref = storage().ref(`profiles/${Date.now()}.jpg`);
+      await ref.putString(asset.base64, 'base64', { contentType: 'image/jpeg' });
       const downloadUrl = await ref.getDownloadURL();
 
       await onSave({ profilePic: downloadUrl });

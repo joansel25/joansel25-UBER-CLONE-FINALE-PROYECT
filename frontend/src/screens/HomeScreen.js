@@ -69,25 +69,68 @@ export default function HomeScreen({ navigation }) {
   const [mapRegion,        setMapRegion]        = useState(DEFAULT_REGION);
   const [gettingGPS,       setGettingGPS]       = useState(false);
   const [nearbyDrivers,    setNearbyDrivers]    = useState([]);
+  const [driverPositions,  setDriverPositions]  = useState({}); // { driverId: { lat, lng } }
 
-  // ── Load nearby drivers; auto-seed simulated ones if none exist ─────────────
+  const intervalRef    = useRef(null);
+  const userLocRef     = useRef(null);
+  const driversSeeded  = useRef(false);
+
+  // Keep latest user location accessible in movement interval without re-creating it
+  useEffect(() => { userLocRef.current = location; }, [location]);
+
+  // Seed/load drivers once user location is known; position them around the user
   useEffect(() => {
+    if (!location || driversSeeded.current) return;
+    driversSeeded.current = true;
     let cancelled = false;
     (async () => {
       try {
+        await seedSimulatedDrivers(location.latitude, location.longitude);
         const { data } = await driverApi.getNearby();
-        if (cancelled) return;
-        if (data.length === 0) {
-          await seedSimulatedDrivers();
-          const { data: seeded } = await driverApi.getNearby();
-          if (!cancelled) setNearbyDrivers(seeded);
-        } else {
-          setNearbyDrivers(data);
-        }
+        if (!cancelled) setNearbyDrivers(data);
       } catch { /* map still works without drivers */ }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [location]);
+
+  // Start movement simulation once drivers are loaded
+  useEffect(() => {
+    if (nearbyDrivers.length === 0) return;
+
+    // Initialise positions from Firestore data
+    const initial = {};
+    nearbyDrivers.forEach(d => {
+      if (d.currentLocation) {
+        initial[d._id] = { lat: d.currentLocation.lat, lng: d.currentLocation.lng };
+      }
+    });
+    setDriverPositions(initial);
+
+    // Move each driver slightly every 2s; pull back if they drift too far from user
+    intervalRef.current = setInterval(() => {
+      const center = userLocRef.current;
+      setDriverPositions(prev => {
+        const next = {};
+        for (const [id, pos] of Object.entries(prev)) {
+          const STEP       = 0.00015; // ~11 m per tick
+          const MAX_RADIUS = 0.018;   // ~1.5 km max drift from user
+          let dlat = (Math.random() - 0.5) * STEP * 2;
+          let dlng = (Math.random() - 0.5) * STEP * 2;
+          if (center) {
+            const offLat = pos.lat - center.latitude;
+            const offLng = pos.lng - center.longitude;
+            if (Math.abs(offLat) > MAX_RADIUS) dlat -= offLat * 0.2;
+            if (Math.abs(offLng) > MAX_RADIUS) dlng -= offLng * 0.2;
+          }
+          next[id] = { lat: pos.lat + dlat, lng: pos.lng + dlng };
+        }
+        return next;
+      });
+    }, 2000);
+
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nearbyDrivers.length]);
 
   // ── Set origin from GPS on first fix ────────────────────────────────────────
   useEffect(() => {
@@ -166,20 +209,25 @@ export default function HomeScreen({ navigation }) {
     }
   }, [t]);
 
-  // ── Find nearest available driver to the origin point ───────────────────────
+  // ── Find nearest driver using live driverPositions (updates every 2s) ────────
   const { nearestDriver, nearestDistKm } = useMemo(() => {
-    const withLoc = nearbyDrivers.filter(d => d.currentLocation);
-    if (!withLoc.length) return { nearestDriver: null, nearestDistKm: null };
-    const ref = originPlace;
-    if (!ref) return { nearestDriver: withLoc[0], nearestDistKm: null };
-    let best = withLoc[0];
-    let bestDist = haversineKm(ref.lat, ref.lng, best.currentLocation.lat, best.currentLocation.lng);
-    for (const d of withLoc.slice(1)) {
-      const dist = haversineKm(ref.lat, ref.lng, d.currentLocation.lat, d.currentLocation.lng);
-      if (dist < bestDist) { best = d; bestDist = dist; }
+    const ids = Object.keys(driverPositions);
+    if (!ids.length) return { nearestDriver: null, nearestDistKm: null };
+
+    const ref = originPlace ?? (userLocRef.current
+      ? { lat: userLocRef.current.latitude, lng: userLocRef.current.longitude }
+      : null);
+    if (!ref) return { nearestDriver: nearbyDrivers[0] ?? null, nearestDistKm: null };
+
+    let bestId   = ids[0];
+    let bestDist = haversineKm(ref.lat, ref.lng, driverPositions[bestId].lat, driverPositions[bestId].lng);
+    for (const id of ids.slice(1)) {
+      const dist = haversineKm(ref.lat, ref.lng, driverPositions[id].lat, driverPositions[id].lng);
+      if (dist < bestDist) { bestId = id; bestDist = dist; }
     }
-    return { nearestDriver: best, nearestDistKm: bestDist.toFixed(1) };
-  }, [originPlace, nearbyDrivers]);
+    const driver = nearbyDrivers.find(d => d._id === bestId) ?? null;
+    return { nearestDriver: driver, nearestDistKm: bestDist.toFixed(1) };
+  }, [originPlace, driverPositions, nearbyDrivers]);
 
   // ── Select autocomplete suggestion ───────────────────────────────────────────
   const handleSelectSuggestion = async (suggestion) => {
@@ -318,16 +366,17 @@ export default function HomeScreen({ navigation }) {
             pinColor={COLORS.danger}
           />
         )}
-        {/* Nearby driver markers */}
+        {/* Nearby driver markers — positions update every 2s from driverPositions state */}
         {nearbyDrivers.map(driver => {
-          if (!driver.currentLocation) return null;
+          const pos = driverPositions[driver._id];
+          if (!pos) return null;
           const isNearest = nearestDriver?._id === driver._id;
           return (
             <Marker
               key={driver._id}
-              coordinate={{ latitude: driver.currentLocation.lat, longitude: driver.currentLocation.lng }}
+              coordinate={{ latitude: pos.lat, longitude: pos.lng }}
               anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={false}
+              tracksViewChanges={isNearest}
             >
               <View style={[styles.driverMarker, isNearest && styles.driverMarkerNearest]}>
                 <Icon

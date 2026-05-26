@@ -58,8 +58,7 @@ export default function RegisterProfileScreen({ navigation }) {
     setIsSaving(true);
     try {
       await userApi.updateProfile(updates);
-      updateDbUser(updates); // instant local state update — language/name changes take effect immediately
-      refreshUser().catch(() => {}); // background sync with Firestore (no await — don't block UI)
+      updateDbUser(updates); // instant merge into dbUser — language change takes effect immediately
       Alert.alert('', t('profile_saved_ok'));
     } catch (error) {
       Alert.alert('Error', t('profile_save_error', error.message));
