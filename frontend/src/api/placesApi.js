@@ -1,4 +1,4 @@
-import { getPlacesAutocomplete, getPlaceDetails } from '../services/mapsService';
+import { getPlacesAutocomplete, getPlaceDetails, reverseGeocode as reverseGeocodeService } from '../services/mapsService';
 
 const placesApi = {
   autocomplete: async (input, { lat, lng, sessionToken } = {}) => {
@@ -9,6 +9,11 @@ const placesApi = {
 
   details: async (placeId, sessionToken) => {
     const result = await getPlaceDetails(placeId, sessionToken);
+    return { data: result };
+  },
+
+  reverseGeocode: async (lat, lng) => {
+    const result = await reverseGeocodeService(lat, lng);
     return { data: result };
   },
 };

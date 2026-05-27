@@ -24,11 +24,16 @@ async function mapsGet(endpoint, params) {
 export async function getPlacesAutocomplete(input, sessionToken, location) {
   if (!input || input.trim().length < 2) return [];
 
-  const params = { input: input.trim(), components: 'country:co' };
+  const params = {
+    input:      input.trim(),
+    components: 'country:co',
+    language:   'es',
+  };
   if (sessionToken) params.sessiontoken = sessionToken;
   if (location) {
+    // 100 km bias radius covers the full Bogotá metropolitan area and surroundings
     params.location = `${location[0]},${location[1]}`;
-    params.radius   = '50000';
+    params.radius   = '100000';
   }
 
   const data = await mapsGet('place/autocomplete/json', params);
@@ -73,12 +78,37 @@ export async function getPlaceDetails(placeId, sessionToken) {
   };
 }
 
+export async function reverseGeocode(lat, lng) {
+  const data = await mapsGet('geocode/json', {
+    latlng:   `${lat},${lng}`,
+    language: 'es',
+    region:   'co',
+  });
+
+  if (data.status !== 'OK' || !data.results?.length) {
+    return { lat, lng, address: 'Mi ubicación actual' };
+  }
+
+  // Use original GPS coordinates for routing — Directions API snaps them to the
+  // nearest road automatically. The geocoded geometry can be a building centroid
+  // or premise interior that Directions cannot route from, causing ZERO_RESULTS.
+  const best = data.results[0];
+  return {
+    lat,
+    lng,
+    address: best.formatted_address,
+  };
+}
+
 export async function getDirections(originLat, originLng, destLat, destLng) {
   const params = {
-    origin:      `${originLat},${originLng}`,
-    destination: `${destLat},${destLng}`,
-    mode:        'driving',
-    units:       'metric',
+    origin:       `${originLat},${originLng}`,
+    destination:  `${destLat},${destLng}`,
+    mode:         'driving',
+    units:        'metric',
+    language:     'es',
+    region:       'co',   // biases results toward Colombia road network
+    alternatives: 'false',
   };
 
   const data = await mapsGet('directions/json', params);
