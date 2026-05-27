@@ -31,6 +31,11 @@ export default function PaymentHistory({ navigation }) {
 
   const fetchTx = useCallback(async (pageNum = 1, append = false) => {
     try {
+      // On first load, reconcile any pending transactions against Stripe's real status.
+      // This fixes records created before the confirmPayment step was in place.
+      if (pageNum === 1) {
+        await paymentApi.syncPendingTransactions().catch(() => {});
+      }
       const res = await paymentApi.list({ page: pageNum, limit: 15 });
       const { transactions: newTx, pages } = res;
       setTransactions(prev => append ? [...prev, ...newTx] : newTx);

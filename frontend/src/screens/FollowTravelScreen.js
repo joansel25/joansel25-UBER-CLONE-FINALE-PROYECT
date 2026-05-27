@@ -21,12 +21,12 @@ import { useTranslation } from '../hooks/useTranslation';
 import { COLORS, SPACING, FONT, RADIUS, SHADOW } from '../constants/theme';
 import { formatCOP }    from '../utils/formatters';
 
-// ── Simulated driver profile (for demo mode) ───────────────────────────────
-const SIM_DRIVER_ID = 'sim_driver_demo';
-const SIM_DRIVER = {
-  _id:        SIM_DRIVER_ID,
-  fullName:   'Carlos Vega',
-  profilePic: 'https://randomuser.me/api/portraits/men/47.jpg',
+// ── Simulated driver fallback (used when no driver is passed via nav params) ──
+const FALLBACK_SIM_DRIVER_ID = 'sim_driver_demo';
+const FALLBACK_SIM_DRIVER = {
+  _id:        FALLBACK_SIM_DRIVER_ID,
+  fullName:   'Carlos Rodríguez',
+  profilePic: 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
   rating:     4.9,
   phone:      '3171234567',
 };
@@ -78,8 +78,12 @@ function samplePolyline(encoded, targetSteps = 35) {
 // ── Screen ─────────────────────────────────────────────────────────────────
 
 export default function FollowTravelScreen({ route, navigation }) {
-  const { tripId } = route.params;
+  const { tripId, simDriver: routeSimDriver, simDriverPos } = route.params;
   const dispatch   = useDispatch();
+
+  // Use the driver that was nearest/selected in HomeScreen, or fall back to default
+  const SIM_DRIVER    = routeSimDriver ?? FALLBACK_SIM_DRIVER;
+  const SIM_DRIVER_ID = routeSimDriver?._id ?? FALLBACK_SIM_DRIVER_ID;
   const { t } = useTranslation();
   const mapRef     = useRef(null);
   const { initPaymentSheet, presentPaymentSheet, confirmPayment } = useStripe();
@@ -124,9 +128,9 @@ export default function FollowTravelScreen({ route, navigation }) {
     const timer = setTimeout(async () => {
       try {
         const origin = trip.origin;
-        // Place simulated driver ~250m away from pickup
-        const simLat = (origin?.lat ?? 4.711) + 0.0022;
-        const simLng = (origin?.lng ?? -74.072) + 0.0012;
+        // Start driver at its actual position on the HomeScreen map, or default offset
+        const simLat = simDriverPos?.lat ?? ((origin?.lat ?? 4.711) + 0.0022);
+        const simLng = simDriverPos?.lng ?? ((origin?.lng ?? -74.072) + 0.0012);
 
         // Write initial driver location to Realtime DB
         await database().ref(`/drivers/${SIM_DRIVER_ID}/location`).set({
@@ -160,8 +164,9 @@ export default function FollowTravelScreen({ route, navigation }) {
     // Capture primitive coords so the closure is stable
     const originLat = trip.origin?.lat  ?? 4.711;
     const originLng = trip.origin?.lng  ?? -74.072;
-    const driverLat = originLat + 0.0022;
-    const driverLng = originLng + 0.0012;
+    // Start from actual driver position (set in Step 1), or fall back to default offset
+    const driverLat = simDriverPos?.lat ?? (originLat + 0.0022);
+    const driverLng = simDriverPos?.lng ?? (originLng + 0.0012);
     const steps = 4;
     let step = 0;
 
@@ -316,12 +321,14 @@ export default function FollowTravelScreen({ route, navigation }) {
     setPayError('');
     try {
       const res = await paymentApi.createIntent(tripId, selectedCardId);
-      const { clientSecret } = res.data;
+      const { clientSecret, txId } = res.data;
       const { error: stripeErr } = await confirmPayment(clientSecret, {
         paymentMethodType: 'Card',
         paymentMethodData: { paymentMethodId: selectedCardId },
       });
       if (stripeErr) throw new Error(stripeErr.message);
+      // Stripe confirmed — mark transaction completed in Firestore
+      await paymentApi.confirmPayment(txId).catch(() => {});
       setPayDone(true);
       setRating(true);
     } catch (err) {
@@ -337,7 +344,7 @@ export default function FollowTravelScreen({ route, navigation }) {
     setPayError('');
     try {
       const res = await paymentApi.createIntent(tripId);
-      const { clientSecret } = res.data;
+      const { clientSecret, txId } = res.data;
       const { error: initErr } = await initPaymentSheet({
         paymentIntentClientSecret: clientSecret,
         merchantDisplayName:       'UberApp',
@@ -350,6 +357,8 @@ export default function FollowTravelScreen({ route, navigation }) {
         if (presentErr.code !== 'Canceled') setPayError(t('follow_pay_error2'));
         return;
       }
+      // Stripe confirmed — mark transaction completed in Firestore
+      await paymentApi.confirmPayment(txId).catch(() => {});
       setPayDone(true);
       setRating(true);
     } catch (err) {

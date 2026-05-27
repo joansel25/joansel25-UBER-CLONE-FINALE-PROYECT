@@ -17,6 +17,8 @@ const S = {
     home_origin_req_msg:      'Por favor ingresa el punto de recogida antes de seleccionar el destino.',
     home_route_error:         'Error de ruta',
     home_route_error_msg:     msg => msg || 'No se pudo calcular la ruta. Intenta de nuevo.',
+    home_origin_too_far:      'El origen está muy lejos del destino. Por favor ingresa la dirección de recogida manualmente.',
+    home_no_route:            'No se encontró una ruta de conducción entre estos puntos. El destino puede estar fuera de la red vial disponible. Intenta con una dirección más cercana a una vía principal.',
     home_place_error:         'No se pudo obtener los detalles del lugar. Intenta de nuevo.',
     home_trip_error:          msg => msg || 'No se pudo crear el viaje. Intenta de nuevo.',
     home_gps_perm_title:      'Permiso requerido',
@@ -186,6 +188,7 @@ const S = {
     detail_error:           'No se pudo cargar el detalle del viaje.',
     tx_pending:             'Pendiente',
     tx_paid:                'Pagado',
+    tx_completed:           'Completado',
     tx_failed:              'Fallido',
     tx_refunded:            'Reembolsado',
 
@@ -286,6 +289,8 @@ const S = {
     home_origin_req_msg:      'Please enter the pickup point before selecting the destination.',
     home_route_error:         'Route error',
     home_route_error_msg:     msg => msg || 'Could not calculate the route. Try again.',
+    home_origin_too_far:      'The origin is too far from the destination. Please enter the pickup address manually.',
+    home_no_route:            'No driving route was found between these points. The destination may be outside the available road network. Try an address closer to a main road.',
     home_place_error:         'Could not get place details. Try again.',
     home_trip_error:          msg => msg || 'Could not create the trip. Try again.',
     home_gps_perm_title:      'Permission required',
@@ -455,6 +460,7 @@ const S = {
     detail_error:           'Could not load trip details.',
     tx_pending:             'Pending',
     tx_paid:                'Paid',
+    tx_completed:           'Completed',
     tx_failed:              'Failed',
     tx_refunded:            'Refunded',
 

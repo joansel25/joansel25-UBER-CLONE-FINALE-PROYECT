@@ -87,8 +87,9 @@ const paymentApi = {
       uid,
     );
 
-    // Record pending transaction in Firestore
-    await txCol().add({
+    // Record pending transaction in Firestore; return its ID so the caller
+    // can mark it 'completed' once Stripe confirms the charge.
+    const txRef = await txCol().add({
       tripId,
       passengerId:   uid,
       amount:        trip.fare,
@@ -101,12 +102,60 @@ const paymentApi = {
 
     return {
       data: {
+        txId:            txRef.id,
         clientSecret:    intent.client_secret,
         paymentIntentId: intent.id,
         amount:          trip.fare,
         currency:        'COP',
       },
     };
+  },
+
+  // ── Mark transaction as completed after Stripe confirms charge ────────────
+  confirmPayment: async (txId) => {
+    await txCol().doc(txId).update({
+      status:  'completed',
+      paidAt:  firestore.FieldValue.serverTimestamp(),
+    });
+    return { data: { success: true } };
+  },
+
+  // ── Sync all pending transactions against the real Stripe status ──────────
+  // Called on PaymentHistory load. Queries Stripe for each pending record and
+  // updates Firestore to 'completed' or 'failed' based on the actual charge result.
+  syncPendingTransactions: async () => {
+    const uid  = getAuth().currentUser?.uid;
+    if (!uid) return;
+
+    const snap = await txCol()
+      .where('passengerId', '==', uid)
+      .where('status', '==', 'pending')
+      .get();
+
+    if (snap.empty) return;
+
+    const batch = firestore().batch();
+    let hasUpdates = false;
+
+    await Promise.all(snap.docs.map(async (doc) => {
+      const { paymentId } = doc.data();
+      if (!paymentId) return;
+      try {
+        const intent = await stripeService.getPaymentIntent(paymentId);
+        if (intent.status === 'succeeded') {
+          batch.update(doc.ref, {
+            status: 'completed',
+            paidAt: firestore.FieldValue.serverTimestamp(),
+          });
+          hasUpdates = true;
+        } else if (intent.status === 'canceled' || intent.status === 'requires_payment_method') {
+          batch.update(doc.ref, { status: 'failed' });
+          hasUpdates = true;
+        }
+      } catch { /* ignore individual lookup errors */ }
+    }));
+
+    if (hasUpdates) await batch.commit();
   },
 
   // ── Transaction by trip ──────────────────────────────────────────────────

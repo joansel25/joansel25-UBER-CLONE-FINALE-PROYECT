@@ -70,3 +70,7 @@ export async function detachPaymentMethod(paymentMethodId) {
 export async function createRefund(paymentIntentId) {
   return stripeRequest('POST', '/refunds', { payment_intent: paymentIntentId });
 }
+
+export async function getPaymentIntent(paymentIntentId) {
+  return stripeRequest('GET', `/payment_intents/${paymentIntentId}`);
+}
