@@ -21,14 +21,15 @@ export const DRIVER_PROFILES = [
     licenseNumber: 'LIC-006', rating: 4.5 },
 ];
 
-// Spread drivers around the user's actual GPS position (offsets in degrees, ~0.5–1.8 km)
+// All drivers within 300 m – 1.2 km so they are visible on the initial map view.
+// Spread in different compass directions to enable realistic nearest-driver dynamics.
 export const OFFSETS = [
-  { dlat:  0.007, dlng:  0.004 },
-  { dlat: -0.006, dlng: -0.009 },
-  { dlat:  0.012, dlng: -0.007 },
-  { dlat: -0.010, dlng:  0.005 },
-  { dlat:  0.003, dlng: -0.015 },
-  { dlat:  0.015, dlng:  0.010 },
+  { dlat:  0.003, dlng:  0.002 },  // ~350 m  NE — very close
+  { dlat: -0.005, dlng:  0.003 },  // ~580 m  SE
+  { dlat:  0.006, dlng: -0.004 },  // ~720 m  NW
+  { dlat: -0.004, dlng: -0.006 },  // ~720 m  SW
+  { dlat:  0.007, dlng:  0.005 },  // ~860 m  ENE
+  { dlat: -0.006, dlng:  0.007 },  // ~920 m  ESE
 ];
 
 export async function seedSimulatedDrivers(centerLat, centerLng) {
