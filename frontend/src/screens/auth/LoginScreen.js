@@ -22,14 +22,12 @@ export default function LoginScreen({ navigation }) {
   const [loading,     setLoading]     = useState(false);
   const [resetting,   setResetting]   = useState(false);
   const [error,       setError]       = useState('');
-  const [debugCode,   setDebugCode]   = useState('');
 
-  const handleEmailChange    = v => { setError(''); setDebugCode(''); setEmail(v); };
-  const handlePasswordChange = v => { setError(''); setDebugCode(''); setPassword(v); };
+  const handleEmailChange    = v => { setError(''); setEmail(v); };
+  const handlePasswordChange = v => { setError(''); setPassword(v); };
 
   const handleLogin = async () => {
     setError('');
-    setDebugCode('');
 
     if (!email.trim()) {
       setError(t('login_no_email'));
@@ -49,7 +47,6 @@ export default function LoginScreen({ navigation }) {
       // onAuthStateChanged takes over from here
     } catch (err) {
       logger.error('Login', `Failed — code:${err.code} | message:${err.message}`);
-      setDebugCode(err.code ?? 'no_code');
       setError(friendlyMessage(err.code, t));
     } finally {
       setLoading(false);
@@ -95,7 +92,7 @@ export default function LoginScreen({ navigation }) {
       >
         <ScrollView
           contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="always"
           showsVerticalScrollIndicator={false}
         >
           {/* ── Logo / Header ── */}
@@ -110,15 +107,7 @@ export default function LoginScreen({ navigation }) {
           {/* ── Form card ── */}
           <View style={styles.card}>
 
-            <ErrorBanner message={error} onDismiss={() => { setError(''); setDebugCode(''); }} />
-
-            {/* Debug code visible en desarrollo */}
-            {__DEV__ && debugCode ? (
-              <View style={styles.debugRow}>
-                <Icon name="bug-outline" size={13} color="#888" />
-                <Text style={styles.debugText}>Firebase code: {debugCode}</Text>
-              </View>
-            ) : null}
+            <ErrorBanner message={error} onDismiss={() => setError('')} />
 
             {/* Email */}
             <View style={styles.field}>
@@ -135,6 +124,7 @@ export default function LoginScreen({ navigation }) {
                   autoCapitalize="none"
                   autoCorrect={false}
                   editable={!loading && !resetting}
+                  showSoftInputOnFocus={true}
                 />
               </View>
             </View>
@@ -260,12 +250,6 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 4,
   },
-
-  debugRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#1a1a2e', borderRadius: 6, padding: 8, marginBottom: 8,
-  },
-  debugText: { fontSize: 11, color: '#aaa', fontFamily: 'monospace' },
 
   field:    { marginBottom: SPACING.sm + 4 },
   label:    { fontSize: FONT.sm, fontWeight: '600', color: COLORS.gray, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
