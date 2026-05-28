@@ -43,14 +43,7 @@ const paymentApi = {
     const userDoc     = await usersCol().doc(uid).get();
     const customerId  = userDoc.data()?.stripeCustomerId;
 
-    if (!customerId) {
-      return {
-        data: [
-          { id: 'demo_pm_001', brand: 'visa',       last4: '4242', expMonth: 12, expYear: 2027 },
-          { id: 'demo_pm_002', brand: 'mastercard', last4: '5555', expMonth:  8, expYear: 2026 },
-        ],
-      };
-    }
+    if (!customerId) return { data: [] };
 
     const methods = await stripeService.listPaymentMethods(customerId);
     const real = (methods.data ?? []).map(pm => ({

@@ -164,6 +164,7 @@ export default function HomeScreen({ navigation }) {
       vehicleInfo:   d.vehicle,
       rating:        d.rating,
       licenseNumber: d.licenseNumber,
+      profilePic:    d.profilePic,
       status:        'available',
       isSimulated:   true,
       currentLocation: {
