@@ -1,6 +1,6 @@
 # UBER_CLONE
 
-A fully functional ride-hailing mobile application built for Android, developed as a final academic project. The app replicates the core experience of a ride-sharing platform — passengers request trips, drivers accept them, and payments are processed in real time.
+A fully functional ride-hailing mobile application built for Android and iOS, developed as a final academic project. The app replicates the core experience of a ride-sharing platform — passengers request trips, drivers accept them, and payments are processed in real time.
 
 **Developers:** Joan Cardenas · Carlos Soto
 
@@ -88,19 +88,35 @@ STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
 Go to [Google Cloud Console](https://console.cloud.google.com) and enable these APIs for your project:
 
 - Maps SDK for Android
+- Maps SDK for iOS
 - Directions API
 - Places API
 - Geocoding API
 
+> **API key restrictions:** Directions API, Places API, and Geocoding API are REST web services called from JavaScript — they are not platform-specific. The same key works on both Android and iOS. Only the Maps SDKs are platform-specific. If your key has an *Android apps* restriction, remove it or create a separate unrestricted key (restricted by API only) so iOS requests are also accepted.
+
 ### Firebase
 
-Place your `google-services.json` file (downloaded from the Firebase console) at:
+The app requires one configuration file per platform, both downloaded from the Firebase console.
+
+**Android** — already included in the repository:
 
 ```
 frontend/android/app/google-services.json
 ```
 
-The file is already included in this repository. If you connect a different Firebase project, replace it with your own.
+**iOS** — you must register an iOS app in your Firebase project and download its file:
+
+1. Open the Firebase console → your project → **Add app** → iOS icon
+2. Use bundle ID: `com.company.Uberjoan`
+3. Download `GoogleService-Info.plist`
+4. Place it at:
+
+```
+frontend/ios/FinaleProyectUber/GoogleService-Info.plist
+```
+
+> Skip steps 3–5 of the Firebase setup wizard (SDK installation, initialization code, connection test) — those apply to native Swift apps. React Native handles all of that automatically through CocoaPods.
 
 ### Stripe
 
@@ -115,6 +131,8 @@ CVC         : any 3 digits
 ---
 
 ## Installation
+
+### Android
 
 **Requirements**
 
@@ -142,11 +160,72 @@ npm install
 
 ---
 
+### iOS
+
+> iOS builds require **macOS with Xcode 15 or later**. This cannot be done from Windows or Linux.
+
+**Requirements**
+
+- macOS with Xcode 15+
+- Node.js >= 22.11.0
+- CocoaPods (`sudo gem install cocoapods`)
+- A physical iPhone or the iOS Simulator (no Apple Developer account needed for Simulator)
+- React Native CLI
+
+**Steps**
+
+```bash
+# 1. Clone the repository
+git clone <repository-url>
+cd FinaleProyectUber/frontend
+
+# 2. Install JS dependencies
+npm install
+
+# 3. Create the environment file
+# Copy the .env block above into frontend/.env with your real keys
+
+# 4. Place GoogleService-Info.plist in the iOS folder
+# frontend/ios/FinaleProyectUber/GoogleService-Info.plist
+# (download from Firebase console — see Firebase section above)
+
+# 5. Install native iOS dependencies
+cd ios
+pod install
+cd ..
+```
+
+**Step 6 — Configure react-native-config in Xcode (one-time setup)**
+
+This step lets the app read the `.env` file on iOS (same as it does on Android).
+
+1. Open `frontend/ios/FinaleProyectUber.xcworkspace` in Xcode — use the `.xcworkspace` file, not `.xcodeproj`
+2. In the Project Navigator (left panel), click the blue `FinaleProyectUber` project icon at the top
+3. Under **TARGETS**, select `FinaleProyectUber`
+4. Go to the **Build Phases** tab
+5. Click **`+`** (top-left of the Build Phases area) → **New Run Script Phase**
+6. Drag the new phase **above** "Compile Sources"
+7. Paste this script into the text field:
+
+```bash
+"${SRCROOT}/../node_modules/react-native-config/ios/ReactNativeConfig/BuildXCConfig.rb" "${SRCROOT}/.." "${SRCROOT}/tmp.xcconfig"
+```
+
+**Step 7 — Add GoogleService-Info.plist to the Xcode target**
+
+The file must be part of the Xcode build, not just present on disk:
+
+1. In the Project Navigator, drag `GoogleService-Info.plist` into the `FinaleProyectUber` folder
+2. When the dialog appears, make sure ✅ **Add to targets: FinaleProyectUber** is checked
+3. Click **Finish**
+
+---
+
 ## Running the app
 
 Open two terminal windows inside the `frontend/` folder.
 
-**Terminal 1 — Metro bundler**
+**Terminal 1 — Metro bundler (both platforms)**
 
 ```bash
 # Option A — npm script
@@ -155,6 +234,8 @@ npm start
 # Option B — npx
 npx react-native start
 ```
+
+### Android
 
 **Terminal 2 — Android build**
 
@@ -173,6 +254,38 @@ The app will build and install on your connected device or running emulator.
 > Latitude:   4.7110
 > Longitude: -74.0721
 > ```
+
+### iOS
+
+**Terminal 2 — iOS build**
+
+```bash
+# Option A — npm script
+npm run ios
+
+# Option B — npx
+npx react-native run-ios
+```
+
+To target a specific simulator:
+
+```bash
+npx react-native run-ios --simulator="iPhone 15"
+```
+
+To run on a physical device, connect it via USB and pass the device name:
+
+```bash
+npx react-native run-ios --device="Your iPhone Name"
+```
+
+> **Simulator GPS note:** The iOS Simulator does not have real GPS. To test location features, open the Simulator menu → **Features** → **Location** → **Custom Location** and enter:
+> ```
+> Latitude:   4.7110
+> Longitude: -74.0721
+> ```
+
+> **Permissions note:** The first time the app requests your location or accesses the photo library, iOS will show a system permission dialog. Tap **Allow** to enable those features.
 
 ---
 
@@ -230,3 +343,5 @@ frontend/
 - The app is configured for **Colombia** (currency COP, address components `country:co`, Google Maps region bias `co`).
 - Stripe is in test mode; no real charges are made.
 - The driver simulation runs entirely client-side — no actual driver accounts are required to demo the full passenger flow.
+- iOS builds require macOS. All JS logic, Firebase, Stripe, and Redux code is shared between platforms — only the native build tooling differs.
+- After running `pod install`, always open the project using `FinaleProyectUber.xcworkspace`, not `FinaleProyectUber.xcodeproj`. The workspace includes the installed CocoaPods.

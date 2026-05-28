@@ -2,13 +2,13 @@ import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, FlatList,
   StyleSheet, Alert, ActivityIndicator, Platform,
-  KeyboardAvoidingView, PermissionsAndroid, Dimensions,
+  KeyboardAvoidingView, Dimensions,
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import Geolocation from '@react-native-community/geolocation';
 import decodePolyline from '../utils/decodePolyline';
 import Icon from 'react-native-vector-icons/Ionicons';
-
+ 
 import { useDispatch, useSelector } from 'react-redux';
 import { setOrigin, setDestination, setActiveTrip } from '../store/slices/tripSlice';
 import { useAuth }     from '../context/AuthContext';
@@ -21,10 +21,11 @@ import { COLORS, RADIUS, FONT, SPACING, SHADOW } from '../constants/theme';
 import { useTranslation } from '../hooks/useTranslation';
 import { useFocusEffect } from '@react-navigation/native';
 import { seedSimulatedDrivers, DRIVER_PROFILES, OFFSETS } from '../utils/seedDrivers';
+import { requestLocationPermission } from '../hooks/useLocationPermission';
 
 const MAX_FARE       = 200000;
 const DEBOUNCE_MS    = 400;
-const DEFAULT_REGION = { latitude: 4.7110, longitude: -74.0721, latitudeDelta: 0.08, longitudeDelta: 0.08 };
+const DEFAULT_REGION = { latitude: 6.2518, longitude: -7.334892, latitudeDelta: 0.08, longitudeDelta: 0.08 };
 const CARD_WIDTH     = Dimensions.get('window').width - SPACING.md * 2; // full panel inner width
 
 const STEP = {
@@ -573,19 +574,10 @@ export default function HomeScreen({ navigation }) {
         style={styles.myLocationBtn}
         disabled={gettingGPS}
         onPress={async () => {
-          if (Platform.OS === 'android') {
-            const already = await PermissionsAndroid.check(
-              PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-            );
-            if (!already) {
-              const result = await PermissionsAndroid.request(
-                PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-              );
-              if (result !== PermissionsAndroid.RESULTS.GRANTED) {
-                Alert.alert(t('home_gps_perm_title'), t('home_gps_perm_msg'));
-                return;
-              }
-            }
+          const granted = await requestLocationPermission();
+          if (!granted) {
+            Alert.alert(t('home_gps_perm_title'), t('home_gps_perm_msg'));
+            return;
           }
           setGettingGPS(true);
           gpsRejected.current = false;
