@@ -564,7 +564,7 @@ export default function HomeScreen({ navigation }) {
               key={driver._id}
               coordinate={{ latitude: pos.lat, longitude: pos.lng }}
               anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={isHighlighted}
+              tracksViewChanges={true}
               onPress={() => setSelectedDriverId(prev => prev === driver._id ? null : driver._id)}
             >
               <View style={[
