@@ -538,7 +538,7 @@ export default function HomeScreen({ navigation }) {
         showsUserLocation
         showsMyLocationButton={false}
       >
-        {originPlace && (
+        {originPlace && destPlace && (
           <Marker
             coordinate={{ latitude: originPlace.lat, longitude: originPlace.lng }}
             title="Origen"
