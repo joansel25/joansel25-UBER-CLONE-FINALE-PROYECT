@@ -158,16 +158,18 @@ export default function HomeScreen({ navigation }) {
 
 
 
-  // Detect return from FollowTravelScreen and reset state
+  // Detect return from FollowTravelScreen and reset state.
+  // Only check hadActiveTripRef — not activeTripRef — because dispatch(clearTrip())
+  // + navigation.goBack() fire together and the ref may not have updated yet.
   useFocusEffect(
     useCallback(() => {
-      if (hadActiveTripRef.current && !activeTripRef.current) {
+      if (hadActiveTripRef.current) {
         resetHomeState();
       }
       hadActiveTripRef.current = false;
 
       return () => {
-        // When leaving HomeScreen, record whether a trip was in progress
+        // Record that we left HomeScreen while a trip was active
         if (activeTripRef.current) hadActiveTripRef.current = true;
       };
     }, [resetHomeState])
@@ -582,8 +584,8 @@ export default function HomeScreen({ navigation }) {
           );
         })}
 
-        {/* Route polyline when estimate is ready */}
-        {estimate?.route?.polyline && (
+        {/* Route polyline — only when both destination and estimate exist */}
+        {estimate?.route?.polyline && destPlace && (
           <Polyline
             coordinates={decodePolyline(estimate.route.polyline)}
             strokeColor={COLORS.primary}
