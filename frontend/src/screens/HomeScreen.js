@@ -106,6 +106,12 @@ export default function HomeScreen({ navigation }) {
     gpsRejected.current = false;
     sessionToken.current = String(Date.now());
 
+    // Reset driver simulation so it restarts clean on the next GPS tick,
+    // preventing stale/duplicate markers after returning from a trip.
+    driversSeeded.current = false;
+    setNearbyDrivers([]);
+    setDriverPositions({});
+
     const loc = userLocRef.current;
     if (loc) {
       const preliminary = { address: 'Mi ubicación actual', lat: loc.latitude, lng: loc.longitude };
@@ -466,7 +472,7 @@ export default function HomeScreen({ navigation }) {
         _id:        featuredDriver._id,
         fullName:   featuredDriver.fullName,
         rating:     featuredDriver.rating,
-        profilePic: 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
+        profilePic: featuredDriver.profilePic ?? null,
         phone:      featuredDriver.vehicleInfo?.plate ?? '',
       } : null;
       const simDriverPos = featuredDriver ? driverPositions[featuredDriver._id] : null;
