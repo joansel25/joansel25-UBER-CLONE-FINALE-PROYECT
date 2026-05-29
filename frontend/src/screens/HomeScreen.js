@@ -106,16 +106,9 @@ export default function HomeScreen({ navigation }) {
     gpsRejected.current = false;
     sessionToken.current = String(Date.now());
 
-    // Reset driver simulation so it restarts clean on the next GPS tick,
-    // preventing stale/duplicate markers after returning from a trip.
-    driversSeeded.current = false;
-    setNearbyDrivers([]);
-    setDriverPositions({});
-
     const loc = userLocRef.current;
     if (loc) {
-      const preliminary = { address: 'Mi ubicación actual', lat: loc.latitude, lng: loc.longitude };
-      setOriginPlace(preliminary);
+      setOriginPlace({ address: 'Mi ubicación actual', lat: loc.latitude, lng: loc.longitude });
       setOriginText('Mi ubicación actual');
       setMapRegion({
         latitude:      loc.latitude,
@@ -132,12 +125,36 @@ export default function HomeScreen({ navigation }) {
         .then(({ data }) => { setOriginPlace(data); return data; })
         .catch(() => null)
         .finally(() => { geocodePromiseRef.current = null; });
+
+      // Rebuild drivers at fresh positions so the map shows them immediately
+      // without stale positions from the previous trip.
+      const freshDrivers = DRIVER_PROFILES.map((d, i) => ({
+        _id: d.id, id: d.id,
+        fullName:      d.fullName,
+        vehicleInfo:   d.vehicle,
+        rating:        d.rating,
+        licenseNumber: d.licenseNumber,
+        profilePic:    d.profilePic,
+        status:        'available',
+        isSimulated:   true,
+        currentLocation: {
+          lat: loc.latitude  + OFFSETS[i].dlat,
+          lng: loc.longitude + OFFSETS[i].dlng,
+        },
+      }));
+      const freshPositions = {};
+      freshDrivers.forEach(d => {
+        freshPositions[d._id] = { lat: d.currentLocation.lat, lng: d.currentLocation.lng };
+      });
+      driversSeeded.current = true;
+      setNearbyDrivers(freshDrivers);
+      setDriverPositions(freshPositions);
     } else {
       setOriginPlace(null);
       setOriginText('');
       setMapRegion(DEFAULT_REGION);
     }
-  }, []); // only uses refs and stable setters
+  }, []); // only uses refs and module-level constants (DRIVER_PROFILES, OFFSETS)
 
 
 
