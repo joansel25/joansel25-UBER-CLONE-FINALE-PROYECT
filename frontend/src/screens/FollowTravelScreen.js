@@ -10,9 +10,12 @@ import { useStripe } from '@stripe/stripe-react-native';
 import firestore from '@react-native-firebase/firestore';
 import database  from '@react-native-firebase/database';
 
-import useTripTracking  from '../hooks/useTripTracking';
-import RatingModal      from '../components/trip/RatingModal';
-import tripApi          from '../api/tripApi';
+import useTripTracking        from '../hooks/useTripTracking';
+import RatingModal             from '../components/trip/RatingModal';
+import SearchingDriversCard    from '../components/trip/SearchingDriversCard';
+import ReportDriverModal       from '../components/trip/ReportDriverModal';
+import { useNotification }    from '../context/NotificationContext';
+import tripApi                 from '../api/tripApi';
 import paymentApi       from '../api/paymentApi';
 import decodePolyline   from '../utils/decodePolyline';
 import { useDispatch }  from 'react-redux';
@@ -81,12 +84,20 @@ export default function FollowTravelScreen({ route, navigation }) {
   const { tripId } = route.params;
   const dispatch   = useDispatch();
   const { t } = useTranslation();
+  const {
+    notifyTripAccepted,
+    notifyTripStarted,
+    notifyTripCompleted,
+    notifyPaymentDone,
+    notifyTripCancelled,
+  } = useNotification();
   const mapRef     = useRef(null);
   const { initPaymentSheet, presentPaymentSheet, confirmPayment } = useStripe();
 
   const [rating,        setRating]        = useState(false);
   const [ratingLoading, setRatingLoading] = useState(false);
   const [cancelling,    setCancelling]    = useState(false);
+  const [reporting,     setReporting]     = useState(false);
 
   // Payment state
   const [savedCards,     setSavedCards]     = useState([]);
@@ -115,6 +126,17 @@ export default function FollowTravelScreen({ route, navigation }) {
       if (simIntervalRef.current) clearInterval(simIntervalRef.current);
     };
   }, []);
+
+  // ── Trip status notifications ─────────────────────────────────────────────
+  const lastNotifiedStatus = useRef(null);
+  useEffect(() => {
+    if (!trip?.status || trip.status === lastNotifiedStatus.current) return;
+    lastNotifiedStatus.current = trip.status;
+    if (trip.status === 'accepted')  notifyTripAccepted(trip.driver?.fullName ?? 'Conductor');
+    if (trip.status === 'ongoing')   notifyTripStarted();
+    if (trip.status === 'completed') notifyTripCompleted();
+    if (trip.status === 'cancelled') notifyTripCancelled();
+  }, [trip?.status, trip?.driver?.fullName, notifyTripAccepted, notifyTripStarted, notifyTripCompleted, notifyTripCancelled]);
 
   // ── SIMULATION STEP 1: Auto-accept after 3s in 'requested' state ───────────
   useEffect(() => {
@@ -323,6 +345,7 @@ export default function FollowTravelScreen({ route, navigation }) {
       });
       if (stripeErr) throw new Error(stripeErr.message);
       setPayDone(true);
+      notifyPaymentDone(formatCOP(fare));
       setRating(true);
     } catch (err) {
       setPayError(err.message ?? t('follow_pay_error1'));
@@ -351,6 +374,7 @@ export default function FollowTravelScreen({ route, navigation }) {
         return;
       }
       setPayDone(true);
+      notifyPaymentDone(formatCOP(fare));
       setRating(true);
     } catch (err) {
       setPayError(err.message ?? t('follow_pay_error3'));
@@ -359,9 +383,9 @@ export default function FollowTravelScreen({ route, navigation }) {
     }
   };
 
-  const handleRate = async (stars) => {
+  const handleRate = async (stars, feedback) => {
     setRatingLoading(true);
-    try { await tripApi.rate(tripId, stars); } catch { }
+    try { await tripApi.rate(tripId, stars, feedback); } catch { }
     setRatingLoading(false);
     dispatch(clearTrip());
     navigation.goBack();
@@ -489,6 +513,11 @@ export default function FollowTravelScreen({ route, navigation }) {
             </View>
           </View>
 
+          {/* Searching animation — shows who is reviewing the request */}
+          {status === 'requested' && (
+            <SearchingDriversCard tripStatus={status} />
+          )}
+
           {/* Driver card — visible once accepted/ongoing */}
           {(status === 'accepted' || status === 'ongoing') && driver && (
             <View style={styles.driverCard}>
@@ -505,8 +534,17 @@ export default function FollowTravelScreen({ route, navigation }) {
                   <Text style={styles.ratingText}>{driver.rating?.toFixed(1) ?? '—'}</Text>
                 </View>
               </View>
-              <View style={styles.fareTag}>
-                <Text style={styles.fareText}>{formatCOP(fare)}</Text>
+              <View style={styles.driverCardActions}>
+                <View style={styles.fareTag}>
+                  <Text style={styles.fareText}>{formatCOP(fare)}</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.reportBtn}
+                  onPress={() => setReporting(true)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Icon name="flag-outline" size={16} color={COLORS.danger} />
+                </TouchableOpacity>
               </View>
             </View>
           )}
@@ -639,6 +677,15 @@ export default function FollowTravelScreen({ route, navigation }) {
         loading={ratingLoading}
         title={t('follow_rate_driver')}
       />
+
+      {/* Report driver modal */}
+      <ReportDriverModal
+        visible={reporting}
+        onClose={() => setReporting(false)}
+        tripId={tripId}
+        driverId={trip?.driverId ?? SIM_DRIVER_ID}
+        driverName={driver?.fullName ?? SIM_DRIVER?.fullName}
+      />
     </View>
   );
 }
@@ -679,8 +726,10 @@ const styles = StyleSheet.create({
   driverName:     { fontSize: FONT.base, fontWeight: '700', color: COLORS.dark },
   ratingRow:      { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   ratingText:     { fontSize: FONT.sm, color: COLORS.gray },
-  fareTag:        { backgroundColor: COLORS.primary, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 },
-  fareText:       { color: COLORS.white, fontWeight: '700', fontSize: FONT.sm },
+  driverCardActions: { alignItems: 'flex-end', gap: 6 },
+  fareTag:           { backgroundColor: COLORS.primary, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 },
+  fareText:          { color: COLORS.white, fontWeight: '700', fontSize: FONT.sm },
+  reportBtn:         { padding: 4 },
 
   addressBlock: { marginBottom: SPACING.sm },
   addressRow:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
