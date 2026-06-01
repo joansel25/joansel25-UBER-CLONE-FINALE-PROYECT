@@ -2,9 +2,9 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList,
   StyleSheet, Alert, ActivityIndicator, Platform,
-  KeyboardAvoidingView, Dimensions,
+  KeyboardAvoidingView, Dimensions, Animated, Image,
 } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Polyline, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
 import Geolocation from '@react-native-community/geolocation';
 import decodePolyline from '../utils/decodePolyline';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -26,7 +26,7 @@ import DriverCarousel      from '../components/trip/DriverCarousel';
 
 const MAX_FARE       = 200000;
 const DEBOUNCE_MS    = 400;
-const DEFAULT_REGION = { latitude: 6.2518, longitude: -7.334892, latitudeDelta: 0.08, longitudeDelta: 0.08 };
+const DEFAULT_REGION = { latitude: 4.7110, longitude: -74.0721, latitudeDelta: 0.022, longitudeDelta: 0.022 };
 const CARD_WIDTH     = Dimensions.get('window').width - SPACING.md * 2; // full panel inner width
 
 const STEP = {
@@ -70,6 +70,21 @@ export default function HomeScreen({ navigation }) {
     featuredDriver, featuredDriverDist,
     userLocRef, resetDrivers,
   } = useDriverSimulation({ location, originPlace, step });
+
+  // Current user coordinates (shorthand for map circle + pulsing marker)
+  const userCoord = location
+    ? { latitude: location.latitude, longitude: location.longitude }
+    : null;
+
+  // Pulsing ring animation for user location indicator
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(pulseAnim, { toValue: 1, duration: 2000, useNativeDriver: true }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulseAnim]);
 
   // Reset all trip-related UI state (called on return from FollowTravelScreen)
   const resetHomeState = useCallback(() => {
@@ -361,9 +376,32 @@ export default function HomeScreen({ navigation }) {
         provider={PROVIDER_GOOGLE}
         style={styles.map}
         region={mapRegion}
-        showsUserLocation
         showsMyLocationButton={false}
       >
+        {/* Coverage circle — shows the radius where drivers operate */}
+        {userCoord && (
+          <Circle
+            center={userCoord}
+            radius={1200}
+            fillColor="rgba(0, 122, 255, 0.06)"
+            strokeColor="rgba(0, 122, 255, 0.22)"
+            strokeWidth={1.5}
+          />
+        )}
+
+        {/* Pulsing user location indicator (replaces default blue dot) */}
+        {userCoord && (
+          <Marker coordinate={userCoord} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+            <View style={styles.userMarkerWrap}>
+              <Animated.View style={[styles.userPulseRing, {
+                opacity:   pulseAnim.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0.7, 0.2, 0] }),
+                transform: [{ scale: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 2.4] }) }],
+              }]} />
+              <View style={styles.userDot} />
+            </View>
+          </Marker>
+        )}
+
         {originPlace && destPlace && (
           <Marker
             coordinate={{ latitude: originPlace.lat, longitude: originPlace.lng }}
@@ -378,7 +416,8 @@ export default function HomeScreen({ navigation }) {
             pinColor={COLORS.danger}
           />
         )}
-        {/* Nearby driver markers — positions update every 2s; tap to select */}
+
+        {/* Driver markers — profile photo + car badge; reposition every 2 s */}
         {nearbyDrivers.map(driver => {
           const pos = driverPositions[driver._id];
           if (!pos) return null;
@@ -389,20 +428,33 @@ export default function HomeScreen({ navigation }) {
             <Marker
               key={driver._id}
               coordinate={{ latitude: pos.lat, longitude: pos.lng }}
-              anchor={{ x: 0.5, y: 0.5 }}
+              anchor={{ x: 0.5, y: 0.9 }}
               tracksViewChanges={true}
               onPress={() => setSelectedDriverId(prev => prev === driver._id ? null : driver._id)}
             >
-              <View style={[
-                styles.driverMarker,
-                isHighlighted && styles.driverMarkerNearest,
-                isSelected    && styles.driverMarkerSelected,
-              ]}>
-                <Icon
-                  name="car"
-                  size={isHighlighted ? 16 : 13}
-                  color={isHighlighted ? COLORS.white : COLORS.primary}
-                />
+              <View style={styles.driverMarkerWrap}>
+                {isHighlighted && (
+                  <View style={[
+                    styles.driverMarkerRing,
+                    isSelected && styles.driverMarkerRingSelected,
+                  ]} />
+                )}
+                {driver.profilePic
+                  ? <Image source={{ uri: driver.profilePic }} style={[
+                      styles.driverMarkerPhoto,
+                      isSelected && styles.driverMarkerPhotoSelected,
+                    ]} />
+                  : <View style={[
+                      styles.driverMarkerFallback,
+                      isHighlighted && styles.driverMarkerFallbackActive,
+                    ]}>
+                      <Icon name="car-sport" size={16} color={isHighlighted ? COLORS.white : COLORS.primary} />
+                    </View>
+                }
+                <View style={[styles.driverMarkerBadge, isHighlighted && styles.driverMarkerBadgeActive]}>
+                  <Icon name="car-sport" size={8} color={COLORS.white} />
+                </View>
+                <View style={[styles.driverMarkerPointer, isHighlighted && styles.driverMarkerPointerActive]} />
               </View>
             </Marker>
           );
@@ -770,25 +822,54 @@ const styles = StyleSheet.create({
   requestBtnDisabled: { backgroundColor: '#A5D6A7' },
   requestBtnText:     { color: COLORS.white, fontSize: FONT.md, fontWeight: '700' },
 
-  // Driver markers on map
-  driverMarker: {
-    width: 34, height: 34, borderRadius: 17,
-    backgroundColor: COLORS.white,
-    borderWidth: 2, borderColor: COLORS.primary,
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 4, elevation: 4,
+  // User location indicator
+  userMarkerWrap: { alignItems: 'center', justifyContent: 'center', width: 60, height: 60 },
+  userPulseRing: {
+    position: 'absolute', width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(0, 122, 255, 0.25)',
+    borderWidth: 1.5, borderColor: 'rgba(0, 122, 255, 0.5)',
   },
-  driverMarkerNearest: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-    width: 42, height: 42, borderRadius: 21,
-    shadowOpacity: 0.3,
+  userDot: {
+    width: 14, height: 14, borderRadius: 7,
+    backgroundColor: '#007AFF',
+    borderWidth: 2.5, borderColor: COLORS.white,
+    shadowColor: '#007AFF', shadowOpacity: 0.5, shadowRadius: 4, elevation: 5,
   },
-  driverMarkerSelected: {
-    backgroundColor: COLORS.success,
-    borderColor: COLORS.success,
+
+  // Driver markers on map — photo + car badge design
+  driverMarkerWrap: { alignItems: 'center' },
+  driverMarkerRing: {
+    position: 'absolute', width: 54, height: 54, borderRadius: 27,
+    borderWidth: 2.5, borderColor: COLORS.primary,
+    top: -5, left: -5,
+  },
+  driverMarkerRingSelected: { borderColor: COLORS.success },
+  driverMarkerPhoto: {
     width: 44, height: 44, borderRadius: 22,
-    shadowOpacity: 0.4,
+    borderWidth: 2.5, borderColor: COLORS.white,
+    backgroundColor: COLORS.border,
   },
+  driverMarkerPhotoSelected: { borderColor: COLORS.success },
+  driverMarkerFallback: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: COLORS.white, borderWidth: 2, borderColor: COLORS.primary,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  driverMarkerFallbackActive: { backgroundColor: COLORS.primary },
+  driverMarkerBadge: {
+    position: 'absolute', bottom: 10, right: -4,
+    width: 18, height: 18, borderRadius: 9,
+    backgroundColor: COLORS.primary,
+    borderWidth: 1.5, borderColor: COLORS.white,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  driverMarkerBadgeActive: { backgroundColor: COLORS.success },
+  driverMarkerPointer: {
+    width: 0, height: 0, marginTop: 1,
+    borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 7,
+    borderLeftColor: 'transparent', borderRightColor: 'transparent',
+    borderTopColor: COLORS.white,
+  },
+  driverMarkerPointerActive: { borderTopColor: COLORS.primary },
 
 });
