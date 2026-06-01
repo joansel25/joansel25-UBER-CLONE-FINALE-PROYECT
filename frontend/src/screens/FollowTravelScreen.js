@@ -26,7 +26,7 @@ const FALLBACK_SIM_DRIVER_ID = 'sim_driver_demo';
 const FALLBACK_SIM_DRIVER = {
   _id:        FALLBACK_SIM_DRIVER_ID,
   fullName:   'Carlos Rodríguez',
-  profilePic: 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
+  profilePic: 'https://randomuser.me/api/portraits/men/32.jpg',
   rating:     4.9,
   phone:      '3171234567',
 };

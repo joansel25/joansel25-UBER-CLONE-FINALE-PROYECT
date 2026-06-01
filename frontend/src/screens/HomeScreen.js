@@ -59,8 +59,8 @@ export default function HomeScreen({ navigation }) {
   const debounceRef     = useRef(null);
   const sessionToken    = useRef(String(Date.now()));
   const destInputRef    = useRef(null);
-  const activeTripRef   = useRef(null);  // mirror of activeTrip for use inside stable callbacks
-  const hadActiveTripRef = useRef(false); // true when we left HomeScreen with an active trip
+  const activeTripRef   = useRef(null);
+  const wentToTripRef   = useRef(false); // set synchronously before navigating to FollowTravel
 
   const [step,             setStep]             = useState(STEP.IDLE);
   const [activeField,      setActiveField]      = useState(null); // 'origin' | 'destination'
@@ -158,21 +158,17 @@ export default function HomeScreen({ navigation }) {
 
 
 
-  // Detect return from FollowTravelScreen and reset state.
-  // Only check hadActiveTripRef — not activeTripRef — because dispatch(clearTrip())
-  // + navigation.goBack() fire together and the ref may not have updated yet.
+  // Reset state when returning from FollowTravelScreen.
+  // wentToTripRef is set synchronously before navigation so there is no race
+  // condition with async effect updates.
   useFocusEffect(
     useCallback(() => {
-      if (hadActiveTripRef.current) {
+      if (wentToTripRef.current) {
+        wentToTripRef.current = false;
         resetHomeState();
+        dispatch(clearTrip());
       }
-      hadActiveTripRef.current = false;
-
-      return () => {
-        // Record that we left HomeScreen while a trip was active
-        if (activeTripRef.current) hadActiveTripRef.current = true;
-      };
-    }, [resetHomeState])
+    }, [resetHomeState, dispatch])
   );
 
   // Build drivers locally from DRIVER_PROFILES as soon as GPS is known.
@@ -496,6 +492,7 @@ export default function HomeScreen({ navigation }) {
       } : null;
       const simDriverPos = featuredDriver ? driverPositions[featuredDriver._id] : null;
 
+      wentToTripRef.current = true; // flag set before navigate — no async race condition
       navigation.navigate('FollowTravel', { tripId: newTrip._id, simDriver: simDriverSnap, simDriverPos });
     } catch (error) {
       Alert.alert('Error', t('home_trip_error', error.message));
