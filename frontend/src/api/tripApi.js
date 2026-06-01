@@ -2,8 +2,9 @@ import firestore from '@react-native-firebase/firestore';
 import { getAuth } from '@react-native-firebase/auth';
 import { getTripEstimate } from '../services/mapsService';
 
-const tripsCol = () => firestore().collection('trips');
-const usersCol = () => firestore().collection('users');
+const tripsCol   = () => firestore().collection('trips');
+const usersCol   = () => firestore().collection('users');
+const driversCol = () => firestore().collection('drivers');
 
 // Timestamps de Firestore → ISO string para que las screens los traten igual
 function convertTs(ts) {
@@ -205,8 +206,8 @@ const tripApi = {
     return { data: docToTrip(doc) };
   },
 
-  // ── Calificar viaje ───────────────────────────────────────────────────────
-  rate: async (id, rating) => {
+  // ── Calificar viaje (dynamic moving average via Firestore transaction) ──────
+  rate: async (id, rating, feedback) => {
     const uid     = getAuth().currentUser?.uid;
     const tripDoc = await tripsCol().doc(id).get();
     if (!tripDoc.exists) throw Object.assign(new Error('Trip not found'), { statusCode: 404 });
@@ -215,29 +216,34 @@ const tripApi = {
     const isPassenger = trip.passengerId === uid;
 
     if (isPassenger) {
-      await tripsCol().doc(id).update({ passengerRatingDriver: rating });
+      const tripUpdate = { passengerRatingDriver: rating };
+      if (feedback) tripUpdate.passengerFeedback = feedback;
+      await tripsCol().doc(id).update(tripUpdate);
 
       if (trip.driverId) {
-        const ratedSnap = await tripsCol().where('driverId', '==', trip.driverId).get();
-        const ratings   = ratedSnap.docs
-          .map(d => d.data().passengerRatingDriver)
-          .filter(r => r != null && r >= 1);
-        if (ratings.length > 0) {
-          const avg = ratings.reduce((s, r) => s + r, 0) / ratings.length;
-          await usersCol().doc(trip.driverId).update({ rating: +avg.toFixed(1) });
-        }
+        // Update driver rating atomically using stored ratingCount + rating
+        await firestore().runTransaction(async tx => {
+          const driverRef = driversCol().doc(trip.driverId);
+          const userRef   = usersCol().doc(trip.driverId);
+          const driverDoc = await tx.get(driverRef);
+          const data      = driverDoc.exists ? driverDoc.data() : {};
+          const count     = (data.ratingCount ?? 0) + 1;
+          const newAvg    = +((((data.rating ?? 5.0) * (count - 1)) + rating) / count).toFixed(1);
+          tx.update(driverRef, { rating: newAvg, ratingCount: count });
+          if (driverDoc.exists) tx.update(userRef, { rating: newAvg });
+        });
       }
     } else {
       await tripsCol().doc(id).update({ driverRatingPassenger: rating });
 
-      const ratedSnap = await tripsCol().where('passengerId', '==', trip.passengerId).get();
-      const ratings   = ratedSnap.docs
-        .map(d => d.data().driverRatingPassenger)
-        .filter(r => r != null && r >= 1);
-      if (ratings.length > 0) {
-        const avg = ratings.reduce((s, r) => s + r, 0) / ratings.length;
-        await usersCol().doc(trip.passengerId).update({ rating: +avg.toFixed(1) });
-      }
+      await firestore().runTransaction(async tx => {
+        const userRef   = usersCol().doc(trip.passengerId);
+        const userDoc   = await tx.get(userRef);
+        const data      = userDoc.exists ? userDoc.data() : {};
+        const count     = (data.ratingCount ?? 0) + 1;
+        const newAvg    = +((((data.rating ?? 5.0) * (count - 1)) + rating) / count).toFixed(1);
+        if (userDoc.exists) tx.update(userRef, { rating: newAvg, ratingCount: count });
+      });
     }
 
     const updated = await tripsCol().doc(id).get();
