@@ -1,34 +1,48 @@
 import firestore from '@react-native-firebase/firestore';
 
+// category: economy (compact sedans), XL (SUVs/vans), premium (high-end sedans)
 export const DRIVER_PROFILES = [
   { id: 'sim_driver_001', fullName: 'Carlos Rodríguez', email: 'carlos.r@sim.co',
-    vehicle: { make: 'Toyota',    model: 'Corolla',  year: 2020, color: 'Blanco',   plate: 'ABC-123' },
-    licenseNumber: 'LIC-001', rating: 4.9 },
+    vehicle: { make: 'Toyota',    model: 'Corolla',      year: 2020, color: 'Blanco',   plate: 'ABC-123' },
+    category: 'economy',
+    licenseNumber: 'LIC-001', rating: 4.9, ratingCount: 312,
+    profilePic: 'https://randomuser.me/api/portraits/men/32.jpg' },
   { id: 'sim_driver_002', fullName: 'María González',   email: 'maria.g@sim.co',
-    vehicle: { make: 'Renault',   model: 'Logan',    year: 2019, color: 'Gris',     plate: 'DEF-456' },
-    licenseNumber: 'LIC-002', rating: 4.7 },
+    vehicle: { make: 'Renault',   model: 'Duster',       year: 2021, color: 'Gris',     plate: 'DEF-456' },
+    category: 'XL',
+    licenseNumber: 'LIC-002', rating: 4.7, ratingCount: 198,
+    profilePic: 'https://randomuser.me/api/portraits/women/44.jpg' },
   { id: 'sim_driver_003', fullName: 'Andrés Martínez',  email: 'andres.m@sim.co',
-    vehicle: { make: 'Chevrolet', model: 'Spark GT', year: 2021, color: 'Rojo',     plate: 'GHI-789' },
-    licenseNumber: 'LIC-003', rating: 4.8 },
+    vehicle: { make: 'Chevrolet', model: 'Spark GT',     year: 2021, color: 'Rojo',     plate: 'GHI-789' },
+    category: 'economy',
+    licenseNumber: 'LIC-003', rating: 4.8, ratingCount: 245,
+    profilePic: 'https://randomuser.me/api/portraits/men/15.jpg' },
   { id: 'sim_driver_004', fullName: 'Luis Pérez',        email: 'luis.p@sim.co',
-    vehicle: { make: 'Mazda',     model: '2',        year: 2022, color: 'Azul',     plate: 'JKL-012' },
-    licenseNumber: 'LIC-004', rating: 4.6 },
+    vehicle: { make: 'Toyota',    model: 'Fortuner',     year: 2022, color: 'Azul',     plate: 'JKL-012' },
+    category: 'XL',
+    licenseNumber: 'LIC-004', rating: 4.6, ratingCount: 156,
+    profilePic: 'https://randomuser.me/api/portraits/men/68.jpg' },
   { id: 'sim_driver_005', fullName: 'Ana Torres',        email: 'ana.t@sim.co',
-    vehicle: { make: 'Kia',       model: 'Picanto',  year: 2020, color: 'Negro',    plate: 'MNO-345' },
-    licenseNumber: 'LIC-005', rating: 4.8 },
+    vehicle: { make: 'Kia',       model: 'Picanto',      year: 2020, color: 'Negro',    plate: 'MNO-345' },
+    category: 'economy',
+    licenseNumber: 'LIC-005', rating: 4.8, ratingCount: 287,
+    profilePic: 'https://randomuser.me/api/portraits/women/26.jpg' },
   { id: 'sim_driver_006', fullName: 'Pedro Vargas',      email: 'pedro.v@sim.co',
-    vehicle: { make: 'Nissan',    model: 'March',    year: 2018, color: 'Plateado', plate: 'PQR-678' },
-    licenseNumber: 'LIC-006', rating: 4.5 },
+    vehicle: { make: 'BMW',       model: '320i',         year: 2023, color: 'Plateado', plate: 'PQR-678' },
+    category: 'premium',
+    licenseNumber: 'LIC-006', rating: 4.5, ratingCount: 89,
+    profilePic: 'https://randomuser.me/api/portraits/men/91.jpg' },
 ];
 
-// Spread drivers around the user's actual GPS position (offsets in degrees, ~0.5–1.8 km)
+// All drivers within 300 m – 1.2 km so they are visible on the initial map view.
+// Spread in different compass directions to enable realistic nearest-driver dynamics.
 export const OFFSETS = [
-  { dlat:  0.007, dlng:  0.004 },
-  { dlat: -0.006, dlng: -0.009 },
-  { dlat:  0.012, dlng: -0.007 },
-  { dlat: -0.010, dlng:  0.005 },
-  { dlat:  0.003, dlng: -0.015 },
-  { dlat:  0.015, dlng:  0.010 },
+  { dlat:  0.003, dlng:  0.002 },  // ~350 m  NE — very close
+  { dlat: -0.005, dlng:  0.003 },  // ~580 m  SE
+  { dlat:  0.006, dlng: -0.004 },  // ~720 m  NW
+  { dlat: -0.004, dlng: -0.006 },  // ~720 m  SW
+  { dlat:  0.007, dlng:  0.005 },  // ~860 m  ENE
+  { dlat: -0.006, dlng:  0.007 },  // ~920 m  ESE
 ];
 
 export async function seedSimulatedDrivers(centerLat, centerLng) {
@@ -42,12 +56,14 @@ export async function seedSimulatedDrivers(centerLat, centerLng) {
       userId:          d.id,
       fullName:        d.fullName,
       vehicleInfo:     d.vehicle,
+      category:        d.category,
       licenseNumber:   d.licenseNumber,
       isVerified:      true,
       isSimulated:     true,
       status:          'available',
       currentLocation: { lat, lng },
       rating:          d.rating,
+      ratingCount:     d.ratingCount,
       createdAt:       firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
 
@@ -60,7 +76,7 @@ export async function seedSimulatedDrivers(centerLat, centerLng) {
       language:    'ES',
       isOnline:    true,
       isSimulated: true,
-      profilePic:  'https://cdn-icons-png.flaticon.com/512/149/149071.png',
+      profilePic:  d.profilePic,
       createdAt:   firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
   });
