@@ -11,6 +11,7 @@ import ContactTab      from './tabs/ContactTab';
 import PreferencesTab  from './tabs/PreferencesTab';
 import { useAuth }     from '../context/AuthContext';
 import { useTranslation } from '../hooks/useTranslation';
+import { useTheme }    from '../context/ThemeContext';
 import userApi         from '../api/userApi';
 
 const TABS = [
@@ -22,11 +23,12 @@ const TABS = [
 export default function RegisterProfileScreen({ navigation }) {
   const { dbUser, signOut, refreshUser, updateDbUser } = useAuth();
   const { t } = useTranslation();
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
 
   const [activeTab, setActiveTab] = useState('personal');
   const [isSaving,  setIsSaving]  = useState(false);
 
-  // Local copy of editable fields — seeded from backend profile
   const [formData, setFormData] = useState({
     fullName: '',
     phone:    '',
@@ -36,7 +38,6 @@ export default function RegisterProfileScreen({ navigation }) {
     photo:    null,
   });
 
-  // Pre-fill form when dbUser loads or refreshes
   useEffect(() => {
     if (dbUser) {
       setFormData({
@@ -55,12 +56,11 @@ export default function RegisterProfileScreen({ navigation }) {
     if (key === 'language') updateDbUser({ language: value });
   };
 
-  // Called by each tab's save button with only the fields it owns
   const handleSave = async (updates) => {
     setIsSaving(true);
     try {
       await userApi.updateProfile(updates);
-      updateDbUser(updates); // instant merge into dbUser — language change takes effect immediately
+      updateDbUser(updates);
       Alert.alert('', t('profile_saved_ok'));
     } catch (error) {
       Alert.alert('Error', t('profile_save_error', error.message));
@@ -85,7 +85,7 @@ export default function RegisterProfileScreen({ navigation }) {
             <Text style={styles.headerTitle}>{t('profile_title')}</Text>
             {dbUser?.rating != null && (
               <View style={styles.ratingRow}>
-                <Icon name="star" size={14} color="#FF9500" />
+                <Icon name="star" size={14} color={colors.warning} />
                 <Text style={styles.ratingText}>{Number(dbUser.rating).toFixed(1)}</Text>
                 <Text style={styles.ratingRole}>
                   · {dbUser.role === 'driver' ? t('profile_role_driver') : t('profile_role_passenger')}
@@ -94,45 +94,44 @@ export default function RegisterProfileScreen({ navigation }) {
             )}
           </View>
           <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
-            <Icon name="log-out-outline" size={22} color="#FF3B30" />
+            <Icon name="log-out-outline" size={22} color={colors.danger} />
           </TouchableOpacity>
         </View>
         <Text style={styles.headerSubtitle}>{t('profile_required')}</Text>
 
-        {/* Quick-action rows — passengers only */}
         {dbUser?.role !== 'driver' && (
           <>
             <TouchableOpacity
               style={styles.walletRow}
               onPress={() => navigation.navigate('PaymentMethods')}
             >
-              <Icon name="card-outline" size={18} color="#007AFF" />
+              <Icon name="card-outline" size={18} color={colors.primary} />
               <Text style={styles.walletText}>{t('profile_payment')}</Text>
-              <Icon name="chevron-forward" size={16} color="#666" style={{ marginLeft: 'auto' }} />
+              <Icon name="chevron-forward" size={16} color={colors.textSecondary} style={{ marginLeft: 'auto' }} />
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.walletRow, { marginTop: 8 }]}
               onPress={() => navigation.navigate('PaymentHistory')}
             >
-              <Icon name="receipt-outline" size={18} color="#007AFF" />
+              <Icon name="receipt-outline" size={18} color={colors.primary} />
               <Text style={styles.walletText}>{t('profile_pay_history')}</Text>
-              <Icon name="chevron-forward" size={16} color="#666" style={{ marginLeft: 'auto' }} />
+              <Icon name="chevron-forward" size={16} color={colors.textSecondary} style={{ marginLeft: 'auto' }} />
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.walletRow, { backgroundColor: '#F0FFF4', marginTop: 8 }]}
+              style={[styles.walletRow, styles.walletRowGreen, { marginTop: 8 }]}
               onPress={() => navigation.navigate('DriverRegister')}
             >
-              <Icon name="car-sport-outline" size={18} color="#34C759" />
-              <Text style={[styles.walletText, { color: '#34C759' }]}>{t('profile_become_driver')}</Text>
-              <Icon name="chevron-forward" size={16} color="#666" style={{ marginLeft: 'auto' }} />
+              <Icon name="car-sport-outline" size={18} color={colors.success} />
+              <Text style={[styles.walletText, { color: colors.success }]}>{t('profile_become_driver')}</Text>
+              <Icon name="chevron-forward" size={16} color={colors.textSecondary} style={{ marginLeft: 'auto' }} />
             </TouchableOpacity>
           </>
         )}
         {isSaving && (
           <View style={styles.savingRow}>
-            <ActivityIndicator size="small" color="#007AFF" />
+            <ActivityIndicator size="small" color={colors.primary} />
             <Text style={styles.savingText}>{t('profile_saving')}</Text>
           </View>
         )}
@@ -150,7 +149,7 @@ export default function RegisterProfileScreen({ navigation }) {
               <Icon
                 name={tab.icon}
                 size={20}
-                color={activeTab === tab.id ? '#007AFF' : '#666'}
+                color={activeTab === tab.id ? colors.primary : colors.textSecondary}
               />
               <Text style={[styles.tabLabel, activeTab === tab.id && styles.tabLabelActive]}>
                 {t(tab.labelKey)}
@@ -190,35 +189,38 @@ export default function RegisterProfileScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container:   { flex: 1, backgroundColor: '#fff' },
-  header:      { paddingHorizontal: 25, paddingTop: 10, paddingBottom: 16 },
-  headerTop:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  headerTitle: { fontSize: 28, fontWeight: '800', color: '#1a1a1a', letterSpacing: -0.5 },
-  ratingRow:   { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 4 },
-  ratingText:  { fontSize: 14, fontWeight: '700', color: '#1a1a1a' },
-  ratingRole:  { fontSize: 13, color: '#666' },
-  logoutBtn:   { padding: 4 },
-  headerSubtitle: { fontSize: 14, color: '#666', marginTop: 6 },
-  savingRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
-  savingText:  { fontSize: 13, color: '#007AFF' },
-  walletRow:   {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    marginTop: 10, paddingVertical: 10, paddingHorizontal: 12,
-    backgroundColor: '#F0F6FF', borderRadius: 10,
-  },
-  walletText:  { fontSize: 14, fontWeight: '600', color: '#007AFF' },
-  tabWrapper:  { paddingHorizontal: 20, marginBottom: 10 },
-  tabContainer: {
-    flexDirection: 'row', backgroundColor: '#f0f0f0', borderRadius: 12, padding: 4,
-  },
-  tabButton:       { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
-  tabButtonActive: {
-    backgroundColor: '#fff', elevation: 2,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1, shadowRadius: 4,
-  },
-  tabLabel:       { fontSize: 11, fontWeight: '600', color: '#666', marginTop: 2 },
-  tabLabelActive: { color: '#007AFF' },
-  tabContent:     { flex: 1 },
-});
+function makeStyles(colors) {
+  return StyleSheet.create({
+    container:      { flex: 1, backgroundColor: colors.surface },
+    header:         { paddingHorizontal: 25, paddingTop: 10, paddingBottom: 16, backgroundColor: colors.surface },
+    headerTop:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+    headerTitle:    { fontSize: 28, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.5 },
+    ratingRow:      { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 4 },
+    ratingText:     { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+    ratingRole:     { fontSize: 13, color: colors.textSecondary },
+    logoutBtn:      { padding: 4 },
+    headerSubtitle: { fontSize: 14, color: colors.textSecondary, marginTop: 6 },
+    savingRow:      { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+    savingText:     { fontSize: 13, color: colors.primary },
+    walletRow: {
+      flexDirection: 'row', alignItems: 'center', gap: 8,
+      marginTop: 10, paddingVertical: 10, paddingHorizontal: 12,
+      backgroundColor: colors.infoBox, borderRadius: 10,
+    },
+    walletRowGreen: { backgroundColor: colors.success + '1A' },
+    walletText:     { fontSize: 14, fontWeight: '600', color: colors.primary },
+    tabWrapper:     { paddingHorizontal: 20, marginBottom: 10, backgroundColor: colors.surface },
+    tabContainer:   {
+      flexDirection: 'row', backgroundColor: colors.lightGray, borderRadius: 12, padding: 4,
+    },
+    tabButton:       { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
+    tabButtonActive: {
+      backgroundColor: colors.surface, elevation: 2,
+      shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1, shadowRadius: 4,
+    },
+    tabLabel:       { fontSize: 11, fontWeight: '600', color: colors.textSecondary, marginTop: 2 },
+    tabLabelActive: { color: colors.primary },
+    tabContent:     { flex: 1 },
+  });
+}

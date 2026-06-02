@@ -380,6 +380,8 @@ export default function HomeScreen({ navigation }) {
   const overLimit     = selectedFare > MAX_FARE;
   const showResults   = step === STEP.SEARCHING;
 
+  const styles = makeStyles(colors);
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
 
@@ -748,134 +750,127 @@ export default function HomeScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  map:       { flex: 1 },
+function makeStyles(colors) {
+  return StyleSheet.create({
+    container: { flex: 1 },
+    map:       { flex: 1 },
 
-  myLocationBtn: {
-    position: 'absolute', top: 16, right: 16,
-    backgroundColor: COLORS.white, borderRadius: RADIUS.full,
-    padding: 10, ...SHADOW.card,
-  },
+    myLocationBtn: {
+      position: 'absolute', top: 16, right: 16,
+      backgroundColor: colors.surface, borderRadius: RADIUS.full,
+      padding: 10, ...SHADOW.card,
+    },
 
-  bottomPanelWrapper: { position: 'absolute', bottom: 0, left: 0, right: 0 },
-  bottomPanel: {
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius:  20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.md,
-    paddingBottom: Platform.OS === 'ios' ? 34 : SPACING.md,
-    ...SHADOW.card,
-    shadowOffset: { width: 0, height: -2 },
-  },
+    bottomPanelWrapper: { position: 'absolute', bottom: 0, left: 0, right: 0 },
+    bottomPanel: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius:  20,
+      borderTopRightRadius: 20,
+      paddingHorizontal: SPACING.md,
+      paddingTop: SPACING.md,
+      paddingBottom: Platform.OS === 'ios' ? 34 : SPACING.md,
+      ...SHADOW.card,
+      shadowOffset: { width: 0, height: -2 },
+    },
 
-  greeting: { fontSize: FONT.md, fontWeight: '700', color: COLORS.dark, marginBottom: SPACING.sm },
+    greeting: { fontSize: FONT.md, fontWeight: '700', color: colors.textPrimary, marginBottom: SPACING.sm },
 
-  inputRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    backgroundColor: '#F7F8FA',
-    borderWidth: 1,
-    borderColor: 'transparent',
-    marginBottom: 4,
-  },
-  inputRowFocused: {
-    borderColor: COLORS.primary,
-    backgroundColor: '#F0F7FF',
-  },
+    inputRow: {
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      paddingVertical: 8, paddingHorizontal: 10,
+      borderRadius: 10, backgroundColor: colors.inputBg,
+      borderWidth: 1, borderColor: 'transparent', marginBottom: 4,
+    },
 
-  dotOrigin: {
-    width: 12, height: 12, borderRadius: 6,
-    backgroundColor: COLORS.primary, borderWidth: 2, borderColor: '#fff',
-    shadowColor: COLORS.primary, shadowOpacity: 0.4, shadowRadius: 3, elevation: 2,
-  },
-  dotDest: { width: 12, height: 12, borderRadius: 3, backgroundColor: COLORS.danger },
+    dotOrigin: {
+      width: 12, height: 12, borderRadius: 6,
+      backgroundColor: colors.primary, borderWidth: 2, borderColor: colors.surface,
+      shadowColor: colors.primary, shadowOpacity: 0.4, shadowRadius: 3, elevation: 2,
+    },
+    dotDest: { width: 12, height: 12, borderRadius: 3, backgroundColor: colors.danger },
 
-  locationInput: { flex: 1, fontSize: FONT.base, color: COLORS.dark, paddingVertical: 4 },
+    locationInput: { flex: 1, fontSize: FONT.base, color: colors.textPrimary, paddingVertical: 4 },
 
-  routeConnector: { alignItems: 'flex-start', paddingLeft: 14, marginVertical: 1 },
-  routeLine:      { width: 2, height: 10, backgroundColor: COLORS.lightGray, marginLeft: 5 },
+    routeConnector: { alignItems: 'flex-start', paddingLeft: 14, marginVertical: 1 },
+    routeLine:      { width: 2, height: 10, backgroundColor: colors.border, marginLeft: 5 },
 
-  suggestionList: { maxHeight: 220, marginTop: 4 },
-  separator:      { height: 1, backgroundColor: COLORS.lightGray },
-  suggestionItem: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 12, paddingHorizontal: 4,
-  },
-  suggestionIcon:      { marginRight: 12 },
-  suggestionTexts:     { flex: 1 },
-  suggestionMain:      { fontSize: FONT.base, fontWeight: '600', color: COLORS.dark },
-  suggestionSecondary: { fontSize: FONT.sm, color: COLORS.gray, marginTop: 2 },
-  noResults:           { textAlign: 'center', color: COLORS.gray, paddingVertical: 16, fontSize: FONT.base },
+    suggestionList: { maxHeight: 220, marginTop: 4 },
+    separator:      { height: 1, backgroundColor: colors.border },
+    suggestionItem: {
+      flexDirection: 'row', alignItems: 'center',
+      paddingVertical: 12, paddingHorizontal: 4,
+    },
+    suggestionIcon:      { marginRight: 12 },
+    suggestionTexts:     { flex: 1 },
+    suggestionMain:      { fontSize: FONT.base, fontWeight: '600', color: colors.textPrimary },
+    suggestionSecondary: { fontSize: FONT.sm, color: colors.textSecondary, marginTop: 2 },
+    noResults:           { textAlign: 'center', color: colors.textSecondary, paddingVertical: 16, fontSize: FONT.base },
 
-  estimatingRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingVertical: SPACING.sm,
-  },
-  estimatingText: { fontSize: FONT.base, color: COLORS.gray },
+    estimatingRow: {
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      paddingVertical: SPACING.sm,
+    },
+    estimatingText: { fontSize: FONT.base, color: colors.textSecondary },
 
-  routeSummary: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingVertical: SPACING.sm,
-    borderBottomWidth: 1, borderBottomColor: COLORS.lightGray,
-    marginBottom: SPACING.sm,
-  },
-  routeText: { fontSize: FONT.base, color: COLORS.dark, fontWeight: '600' },
+    routeSummary: {
+      flexDirection: 'row', alignItems: 'center', gap: 8,
+      paddingVertical: SPACING.sm,
+      borderBottomWidth: 1, borderBottomColor: colors.border,
+      marginBottom: SPACING.sm,
+    },
+    routeText: { fontSize: FONT.base, color: colors.textPrimary, fontWeight: '600' },
 
-  fareRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
-    marginTop: SPACING.sm, marginBottom: SPACING.sm,
-  },
-  fareLabel:       { fontSize: FONT.sm, color: COLORS.gray },
-  limitWarning:    { fontSize: 11, color: COLORS.danger, fontWeight: '600', marginTop: 2 },
-  fareAmount:      { fontSize: FONT.xl, fontWeight: '800', color: COLORS.dark },
-  fareAmountOver:  { color: COLORS.danger },
+    fareRow: {
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
+      marginTop: SPACING.sm, marginBottom: SPACING.sm,
+    },
+    fareLabel:      { fontSize: FONT.sm, color: colors.textSecondary },
+    limitWarning:   { fontSize: 11, color: colors.danger, fontWeight: '600', marginTop: 2 },
+    fareAmount:     { fontSize: FONT.xl, fontWeight: '800', color: colors.textPrimary },
+    fareAmountOver: { color: colors.danger },
 
-  requestBtn: {
-    backgroundColor: COLORS.success,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, paddingVertical: 14, borderRadius: RADIUS.sm, marginTop: 4,
-  },
-  requestBtnDisabled: { backgroundColor: '#A5D6A7' },
-  requestBtnText:     { color: COLORS.white, fontSize: FONT.md, fontWeight: '700' },
+    requestBtn: {
+      backgroundColor: colors.success,
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+      gap: 8, paddingVertical: 14, borderRadius: RADIUS.sm, marginTop: 4,
+    },
+    requestBtnDisabled: { opacity: 0.55 },
+    requestBtnText:     { color: '#fff', fontSize: FONT.md, fontWeight: '700' },
 
-  // User location indicator
-  userMarkerWrap: { alignItems: 'center', justifyContent: 'center', width: 64, height: 64 },
-  userPulseRing: {
-    position: 'absolute', width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(10, 99, 255, 0.30)',
-    borderWidth: 2, borderColor: 'rgba(10, 99, 255, 0.75)',
-  },
-  userDot: {
-    width: 17, height: 17, borderRadius: 9,
-    backgroundColor: '#0A63FF',
-    borderWidth: 2.5, borderColor: COLORS.white,
-    shadowColor: '#0A63FF', shadowOpacity: 0.80, shadowRadius: 6, elevation: 8,
-  },
+    // User location indicator
+    userMarkerWrap: { alignItems: 'center', justifyContent: 'center', width: 64, height: 64 },
+    userPulseRing: {
+      position: 'absolute', width: 40, height: 40, borderRadius: 20,
+      backgroundColor: 'rgba(10, 99, 255, 0.30)',
+      borderWidth: 2, borderColor: 'rgba(10, 99, 255, 0.75)',
+    },
+    userDot: {
+      width: 17, height: 17, borderRadius: 9,
+      backgroundColor: '#0A63FF',
+      borderWidth: 2.5, borderColor: colors.surface,
+      shadowColor: '#0A63FF', shadowOpacity: 0.80, shadowRadius: 6, elevation: 8,
+    },
 
-  // Driver markers on map — car icon design
-  driverMarkerWrap: { alignItems: 'center' },
-  driverMarkerRing: {
-    position: 'absolute', width: 54, height: 54, borderRadius: 12,
-    borderWidth: 2.5, borderColor: COLORS.primary,
-    top: -5, left: -5,
-  },
-  driverMarkerRingSelected: { borderColor: COLORS.success },
-  driverMarkerFallback: {
-    width: 44, height: 44, borderRadius: 10,
-    backgroundColor: COLORS.white, borderWidth: 2, borderColor: COLORS.primary,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  driverMarkerFallbackActive: { backgroundColor: COLORS.primary },
-  driverMarkerPointer: {
-    width: 0, height: 0, marginTop: 1,
-    borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 7,
-    borderLeftColor: 'transparent', borderRightColor: 'transparent',
-    borderTopColor: COLORS.white,
-  },
-  driverMarkerPointerActive: { borderTopColor: COLORS.primary },
-
-});
+    // Driver markers on map
+    driverMarkerWrap: { alignItems: 'center' },
+    driverMarkerRing: {
+      position: 'absolute', width: 54, height: 54, borderRadius: 12,
+      borderWidth: 2.5, borderColor: colors.primary,
+      top: -5, left: -5,
+    },
+    driverMarkerRingSelected: { borderColor: colors.success },
+    driverMarkerFallback: {
+      width: 44, height: 44, borderRadius: 10,
+      backgroundColor: colors.surface, borderWidth: 2, borderColor: colors.primary,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    driverMarkerFallbackActive: { backgroundColor: colors.primary },
+    driverMarkerPointer: {
+      width: 0, height: 0, marginTop: 1,
+      borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 7,
+      borderLeftColor: 'transparent', borderRightColor: 'transparent',
+      borderTopColor: colors.surface,
+    },
+    driverMarkerPointerActive: { borderTopColor: colors.primary },
+  });
+}

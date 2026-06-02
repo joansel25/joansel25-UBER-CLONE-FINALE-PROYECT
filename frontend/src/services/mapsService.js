@@ -134,6 +134,25 @@ export function calculateFare(distanceMeters, durationSeconds, category = 'econo
   };
 }
 
+export async function reverseGeocode(lat, lng) {
+  const data = await mapsGet('geocode/json', { latlng: `${lat},${lng}` });
+
+  if (data.status === 'ZERO_RESULTS' || !data.results?.length) {
+    return { lat, lng, address: `${lat.toFixed(5)}, ${lng.toFixed(5)}` };
+  }
+  if (data.status !== 'OK') {
+    console.error('[Maps] reverse geocode status:', data.status, data.error_message ?? '');
+    return { lat, lng, address: `${lat.toFixed(5)}, ${lng.toFixed(5)}` };
+  }
+
+  const best = data.results[0];
+  return {
+    lat,
+    lng,
+    address: best.formatted_address,
+  };
+}
+
 export async function getTripEstimate(originLat, originLng, destLat, destLng) {
   const route = await getDirections(originLat, originLng, destLat, destLng);
   const fares = {

@@ -1,4 +1,4 @@
-import firestore from '@react-native-firebase/firestore';
+import { getFirestore, collection, doc, writeBatch, serverTimestamp } from '@react-native-firebase/firestore';
 
 // category: economy (compact sedans), XL (SUVs/vans), premium (high-end sedans)
 export const DRIVER_PROFILES = [
@@ -46,13 +46,14 @@ export const OFFSETS = [
 ];
 
 export async function seedSimulatedDrivers(centerLat, centerLng) {
-  const batch = firestore().batch();
+  const db    = getFirestore();
+  const batch = writeBatch(db);
 
   DRIVER_PROFILES.forEach((d, i) => {
     const lat = centerLat + OFFSETS[i].dlat;
     const lng = centerLng + OFFSETS[i].dlng;
 
-    batch.set(firestore().collection('drivers').doc(d.id), {
+    batch.set(doc(db, 'drivers', d.id), {
       userId:          d.id,
       fullName:        d.fullName,
       vehicleInfo:     d.vehicle,
@@ -64,10 +65,10 @@ export async function seedSimulatedDrivers(centerLat, centerLng) {
       currentLocation: { lat, lng },
       rating:          d.rating,
       ratingCount:     d.ratingCount,
-      createdAt:       firestore.FieldValue.serverTimestamp(),
+      createdAt:       serverTimestamp(),
     }, { merge: true });
 
-    batch.set(firestore().collection('users').doc(d.id), {
+    batch.set(doc(db, 'users', d.id), {
       fullName:    d.fullName,
       email:       d.email,
       phone:       `+5730000000${i + 1}`,
@@ -77,7 +78,7 @@ export async function seedSimulatedDrivers(centerLat, centerLng) {
       isOnline:    true,
       isSimulated: true,
       profilePic:  d.profilePic,
-      createdAt:   firestore.FieldValue.serverTimestamp(),
+      createdAt:   serverTimestamp(),
     }, { merge: true });
   });
 

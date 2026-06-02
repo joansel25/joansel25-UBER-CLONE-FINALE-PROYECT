@@ -10,26 +10,25 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import tripApi    from '../api/tripApi';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../hooks/useTranslation';
+import { useTheme } from '../context/ThemeContext';
 import { COLORS, SPACING, FONT, RADIUS, SHADOW } from '../constants/theme';
 import { formatCOP, formatDate } from '../utils/formatters';
 
-// ── Status config (labels resolved via t() at render time) ─────────────────
-
-const STATUS = {
-  requested: { color: '#FF9500', bg: '#FFF3E0' },
-  accepted:  { color: '#007AFF', bg: '#E3F2FD' },
-  ongoing:   { color: '#5856D6', bg: '#EEF2FF' },
-  completed: { color: '#34C759', bg: '#F0FFF4' },
-  cancelled: { color: '#FF3B30', bg: '#FFF0F0' },
-};
-
 const VEHICLE_LABEL = { economy: 'Economy', xl: 'XL', premium: 'Premium' };
-
-// ── Screen ──────────────────────────────────────────────────────────────────
 
 export default function TravelHistory({ navigation }) {
   const { dbUser } = useAuth();
   const { t } = useTranslation();
+  const { colors, isDark } = useTheme();
+  const styles = makeStyles(colors);
+
+  const STATUS = {
+    requested: { color: colors.warning,                         bg: isDark ? '#2D1A00' : '#FFF3E0' },
+    accepted:  { color: colors.primary,                         bg: colors.infoBox },
+    ongoing:   { color: isDark ? '#7C7AE8' : '#5856D6',         bg: isDark ? '#1E1E30' : '#EEF2FF' },
+    completed: { color: colors.success,                         bg: isDark ? '#0A2010' : '#F0FFF4' },
+    cancelled: { color: colors.danger,                          bg: isDark ? '#2D0000' : '#FFF0F0' },
+  };
 
   const [trips,      setTrips]      = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -74,8 +73,6 @@ export default function TravelHistory({ navigation }) {
     fetchTrips(page + 1, true);
   };
 
-  // ── Render ─────────────────────────────────────────────────────────────────
-
   const renderItem = ({ item }) => {
     const st  = STATUS[item.status] ?? STATUS.completed;
     const isDriver = item.driver?._id === dbUser?._id || item.driver === dbUser?._id;
@@ -87,7 +84,6 @@ export default function TravelHistory({ navigation }) {
         onPress={() => navigation.navigate('TripDetail', { tripId: item._id })}
         activeOpacity={0.85}
       >
-        {/* Header row */}
         <View style={styles.cardHeader}>
           <View style={[styles.badge, { backgroundColor: st.bg }]}>
             <Text style={[styles.badgeText, { color: st.color }]}>{t('status_' + item.status)}</Text>
@@ -95,37 +91,35 @@ export default function TravelHistory({ navigation }) {
           <Text style={styles.cardFare}>{formatCOP(item.fare)}</Text>
         </View>
 
-        {/* Route */}
         <View style={styles.routeBlock}>
           <View style={styles.routeRow}>
-            <Icon name="radio-button-on" size={12} color={COLORS.primary} />
+            <Icon name="radio-button-on" size={12} color={colors.primary} />
             <Text style={styles.routeText} numberOfLines={1}>
               {item.origin?.address ?? '—'}
             </Text>
           </View>
           <View style={[styles.routeRow, { marginTop: 4 }]}>
-            <Icon name="location" size={12} color={COLORS.danger} />
+            <Icon name="location" size={12} color={colors.danger} />
             <Text style={styles.routeText} numberOfLines={1}>
               {item.destination?.address ?? '—'}
             </Text>
           </View>
         </View>
 
-        {/* Footer */}
         <View style={styles.cardFooter}>
           <View style={styles.metaItem}>
-            <Icon name="time-outline" size={13} color={COLORS.gray} />
+            <Icon name="time-outline" size={13} color={colors.textSecondary} />
             <Text style={styles.metaText}>{formatDate(item.createdAt)}</Text>
           </View>
           {VEHICLE_LABEL[item.vehicleCategory] && (
             <View style={styles.metaItem}>
-              <Icon name="car-outline" size={13} color={COLORS.gray} />
+              <Icon name="car-outline" size={13} color={colors.textSecondary} />
               <Text style={styles.metaText}>{VEHICLE_LABEL[item.vehicleCategory]}</Text>
             </View>
           )}
           {other?.fullName && (
             <View style={styles.metaItem}>
-              <Icon name="person-outline" size={13} color={COLORS.gray} />
+              <Icon name="person-outline" size={13} color={colors.textSecondary} />
               <Text style={styles.metaText} numberOfLines={1}>{other.fullName}</Text>
             </View>
           )}
@@ -137,7 +131,7 @@ export default function TravelHistory({ navigation }) {
   if (loading) {
     return (
       <SafeAreaView style={styles.center}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <ActivityIndicator size="large" color={colors.primary} />
       </SafeAreaView>
     );
   }
@@ -150,7 +144,7 @@ export default function TravelHistory({ navigation }) {
 
       {error ? (
         <View style={styles.center}>
-          <Icon name="alert-circle-outline" size={40} color={COLORS.danger} />
+          <Icon name="alert-circle-outline" size={40} color={colors.danger} />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={handleRefresh}>
             <Text style={styles.retryText}>{t('history_retry')}</Text>
@@ -167,20 +161,20 @@ export default function TravelHistory({ navigation }) {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              colors={[COLORS.primary]}
-              tintColor={COLORS.primary}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
             />
           }
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.3}
           ListFooterComponent={
             loadingMore
-              ? <ActivityIndicator style={{ margin: SPACING.md }} color={COLORS.primary} />
+              ? <ActivityIndicator style={{ margin: SPACING.md }} color={colors.primary} />
               : null
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Icon name="car-outline" size={56} color={COLORS.border} />
+              <Icon name="car-outline" size={56} color={colors.border} />
               <Text style={styles.emptyTitle}>{t('history_empty')}</Text>
               <Text style={styles.emptySubtitle}>{t('history_empty_sub')}</Text>
             </View>
@@ -191,51 +185,51 @@ export default function TravelHistory({ navigation }) {
   );
 }
 
-// ── Styles ───────────────────────────────────────────────────────────────────
+function makeStyles(colors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    center:    { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SPACING.sm },
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
-  center:    { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SPACING.sm },
+    header: {
+      paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1, borderBottomColor: colors.border,
+    },
+    title: { fontSize: FONT.xl, fontWeight: '800', color: colors.textPrimary },
 
-  header: {
-    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
-    backgroundColor: COLORS.white,
-    borderBottomWidth: 1, borderBottomColor: COLORS.border,
-  },
-  title: { fontSize: FONT.xl, fontWeight: '800', color: COLORS.dark },
+    list: { padding: SPACING.md, flexGrow: 1 },
 
-  list: { padding: SPACING.md, flexGrow: 1 },
+    card: {
+      backgroundColor: colors.surface, borderRadius: RADIUS.md,
+      padding: SPACING.md, ...SHADOW.card, gap: SPACING.xs,
+    },
+    cardHeader: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    },
+    badge:     { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
+    badgeText: { fontSize: 11, fontWeight: '700' },
+    cardFare:  { fontSize: FONT.lg, fontWeight: '800', color: colors.textPrimary },
 
-  card: {
-    backgroundColor: COLORS.white, borderRadius: RADIUS.md,
-    padding: SPACING.md, ...SHADOW.card, gap: SPACING.xs,
-  },
-  cardHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-  },
-  badge:     { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
-  badgeText: { fontSize: 11, fontWeight: '700' },
-  cardFare:  { fontSize: FONT.lg, fontWeight: '800', color: COLORS.dark },
+    routeBlock: { gap: 0 },
+    routeRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+    routeText:  { flex: 1, fontSize: FONT.sm, color: colors.textPrimary, lineHeight: 18 },
 
-  routeBlock: { gap: 0 },
-  routeRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
-  routeText:  { flex: 1, fontSize: FONT.sm, color: COLORS.dark, lineHeight: 18 },
+    cardFooter: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginTop: 2 },
+    metaItem:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    metaText:   { fontSize: 12, color: colors.textSecondary, maxWidth: 120 },
 
-  cardFooter: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginTop: 2 },
-  metaItem:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  metaText:   { fontSize: 12, color: COLORS.gray, maxWidth: 120 },
+    errorText: { fontSize: FONT.base, color: colors.danger, textAlign: 'center', paddingHorizontal: SPACING.lg },
+    retryBtn:  { paddingVertical: 10, paddingHorizontal: 28, borderRadius: RADIUS.sm, backgroundColor: colors.primary },
+    retryText: { color: '#fff', fontWeight: '700' },
 
-  errorText: { fontSize: FONT.base, color: COLORS.danger, textAlign: 'center', paddingHorizontal: SPACING.lg },
-  retryBtn:  { paddingVertical: 10, paddingHorizontal: 28, borderRadius: RADIUS.sm, backgroundColor: COLORS.primary },
-  retryText: { color: COLORS.white, fontWeight: '700' },
-
-  empty: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    paddingTop: 80, gap: SPACING.sm,
-  },
-  emptyTitle:    { fontSize: FONT.lg, fontWeight: '800', color: COLORS.dark },
-  emptySubtitle: {
-    fontSize: FONT.sm, color: COLORS.gray,
-    textAlign: 'center', paddingHorizontal: SPACING.lg,
-  },
-});
+    empty: {
+      flex: 1, alignItems: 'center', justifyContent: 'center',
+      paddingTop: 80, gap: SPACING.sm,
+    },
+    emptyTitle:    { fontSize: FONT.lg, fontWeight: '800', color: colors.textPrimary },
+    emptySubtitle: {
+      fontSize: FONT.sm, color: colors.textSecondary,
+      textAlign: 'center', paddingHorizontal: SPACING.lg,
+    },
+  });
+}
